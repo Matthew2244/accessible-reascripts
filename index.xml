@@ -2,7 +2,7 @@
 <index version="1" name="Accessible ReaScripts">
   <category name="Accessible ReaScripts">
     <reapack name="Accessible ReaScripts" type="script" desc="Accessible ReaScripts">
-      <version name="1.0.0" author="Accessible ReaScripts contributors">
+      <version name="1.0.1" author="Accessible ReaScripts contributors">
         <source main="main" file="Tracks/a11y_Add FX by name.lua">https://github.com/Matthew2244/accessible-reascripts/raw/main/Tracks/a11y_Add%20FX%20by%20name.lua</source>
         <source main="main" file="Tracks/a11y_Insert track template by name.lua">https://github.com/Matthew2244/accessible-reascripts/raw/main/Tracks/a11y_Insert%20track%20template%20by%20name.lua</source>
         <source main="main" file="Tracks/a11y_Rename selected tracks.lua">https://github.com/Matthew2244/accessible-reascripts/raw/main/Tracks/a11y_Rename%20selected%20tracks.lua</source>

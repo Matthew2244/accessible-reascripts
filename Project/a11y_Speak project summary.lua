@@ -1,7 +1,7 @@
 --[[
   @description Speak project summary (accessible)
   @author Accessible ReaScripts contributors
-  @version 1.0.0
+  @version 1.0.1
   @provides [main] .
   @about
     Speaks an overview of the current project in one keystroke: name and

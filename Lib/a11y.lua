@@ -23,7 +23,7 @@
 
 local a11y = {}
 
-a11y.VERSION = '1.0.0'
+a11y.VERSION = '1.0.1'
 
 --------------------------------------------------------------------------
 -- Speech
@@ -447,9 +447,19 @@ function a11y.path_join(...)
 end
 
 --- Filename without its directory or extension.
+--
+-- On Windows both separators have to count. Reaper hands back backslashes,
+-- but a project can easily reference media saved with forward slashes, and
+-- matching only the platform separator then finds no separator at all and
+-- returns the whole path. That is not a silent bug: it is read out loud, so
+-- `Speak project summary` announces "C colon backslash Songs backslash take
+-- underscore 003" where it should say "take, version 3".
+--
+-- Off Windows a backslash is a legal character in a filename, so it stays a
+-- normal character there rather than being treated as a separator.
 function a11y.basename(path, strip_ext)
-  local s = a11y.sep()
-  local name = path:match('([^' .. s .. ']+)$') or path
+  local set = a11y.sep() == '\\' and '\\/' or '/'
+  local name = path:match('([^' .. set .. ']+)$') or path
   if strip_ext then name = name:gsub('%.[^.]+$', '') end
   return name
 end
