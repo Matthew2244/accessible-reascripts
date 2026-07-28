@@ -92,6 +92,32 @@ Two things to know before touching path handling:
   in `Lib/a11y.lua`; over 2000 plugin names a bare subsequence search for
   `ssl` matches 472 of them. Do not "fix" this by always enabling them.
 
+## Maintainer notes
+
+**Going public needs no code changes.** `index.xml` already points at
+`raw/main/`, so ReaPack starts working the moment visibility flips — there is
+nothing to regenerate. Verified before the repo was opened up: the git history
+has only ever contained the files currently tracked, and
+`tools/fixtures/track_templates.txt` — which holds real client and
+collaborator names — has never been committed on any branch. Re-run that check
+before publishing anything else:
+
+```bash
+git log --all --pretty=format: --name-only --diff-filter=A | sort -u
+```
+
+**Adding a script means regenerating the index in the same commit.**
+`build_index.py --check` runs in CI and will catch it, but catching it locally
+is faster:
+
+```bash
+python3 tools/build_index.py --url https://github.com/Matthew2244/accessible-reascripts --branch main
+```
+
+**Bump `@version` when a script's behaviour changes**, and `a11y.VERSION` when
+the library's does. The index takes the highest `@version` it finds, so a
+change with no bump ships to ReaPack users as no change at all.
+
 ## Do not reimplement REAPER or SWS
 
 Check the action list first. Where a native action already does the work but

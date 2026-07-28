@@ -106,21 +106,32 @@ for the whole rename.
 
 ## Installing
 
-This repository is **private**, so install it by cloning. ReaPack cannot be
-used while it stays private: ReaPack fetches the index over a plain HTTPS
-request with no way to send a GitHub token, so a private repository just
-returns "not found" to it.
+Two routes: ReaPack if you just want the scripts, a clone if you might change
+them.
 
-An `index.xml` is generated and committed anyway, so if the repository is ever
-made public, ReaPack works immediately with no further setup.
+### With ReaPack
 
-### Clone and link
+In REAPER, go to Extensions, ReaPack, Import repositories, and paste:
 
-You need access to the repository — ask Matthew for an invite — and a GitHub
-account with `gh` or an SSH key set up.
+`https://github.com/Matthew2244/accessible-reascripts/raw/main/index.xml`
 
-Clone it, then point REAPER at it with a symbolic link, so edits are live
-without copying files around each time:
+Then Extensions, ReaPack, Browse packages, and install "Accessible ReaScripts".
+It arrives as a single package — every script plus the shared library — so
+there is nothing to keep in sync by hand, and updates come through ReaPack
+like any other repository.
+
+**While this repository is private, ReaPack cannot reach it.** ReaPack fetches
+the index with a plain HTTPS request and has no way to send a GitHub token, so
+a private repository simply answers "not found". The index is generated and
+committed regardless, so this route starts working the moment the repository
+goes public, with nothing to change and nothing to regenerate.
+
+### By cloning
+
+The better route if you might change anything, because your edits are live in
+REAPER with no reinstall step. This is how contributors work.
+
+Clone it, then point REAPER at it with a symbolic link:
 
 ```bash
 git clone https://github.com/Matthew2244/accessible-reascripts.git ~/accessible-reascripts
@@ -136,19 +147,6 @@ mklink /D "%APPDATA%\REAPER\Scripts\accessible-reascripts" "%USERPROFILE%\access
 
 Update later with `git pull` in that folder. Nothing needs reinstalling; the
 symbolic link means REAPER is already reading the new files.
-
-### If it is ever made public
-
-Regenerate the index and push it:
-
-```bash
-python3 tools/build_index.py --url https://github.com/Matthew2244/accessible-reascripts --branch main
-```
-
-Then anyone can add it in REAPER under Extensions, ReaPack, Import
-repositories, using:
-
-`https://github.com/Matthew2244/accessible-reascripts/raw/main/index.xml`
 
 Keep the `Lib` folder next to the script folders. Every script loads
 `Lib/a11y.lua` from one level up, and will say so out loud if it cannot find
