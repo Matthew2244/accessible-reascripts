@@ -1,0 +1,43 @@
+name: Checks
+
+# Everything here runs without REAPER, which is the point: a contributor gets
+# an answer on a pull request without installing a DAW, and a review does not
+# depend on someone running the tests by hand and remembering to say so.
+#
+# tools/check_api.py is deliberately absent. It works by reading the REAPER and
+# OSARA binaries for the API names they register, and neither can be installed
+# on a runner, so it stays a local check — run it before opening a pull
+# request. Nothing here tests behaviour inside REAPER either; that still needs
+# a scratch project and a pair of ears.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Lua 5.4
+        # REAPER 7 embeds Lua 5.4, so test against that rather than whatever
+        # the runner happens to ship.
+        run: sudo apt-get update && sudo apt-get install -y lua5.4
+
+      - name: Every Lua file compiles
+        # The test suite only loads Lib/a11y.lua, so without this a syntax
+        # error in a script would go unnoticed until someone loaded the action
+        # in REAPER and heard nothing happen. -n1 keeps one file per run, so
+        # the failing filename is unambiguous.
+        run: find . -name '*.lua' -not -path './.git/*' -print0 | xargs -0 -n1 luac5.4 -p
+
+      - name: Library tests
+        run: lua5.4 tools/test_a11y.lua
+
+      - name: ReaPack index matches the scripts
+        run: python3 tools/build_index.py --check

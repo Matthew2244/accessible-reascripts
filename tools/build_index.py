@@ -14,8 +14,11 @@ half-working collection.
 
 Usage:
     python3 tools/build_index.py --url https://github.com/OWNER/REPO --branch main
+    python3 tools/build_index.py --check
 
-Writes index.xml at the repo root.
+Writes index.xml at the repo root. --check writes nothing and reports whether
+the committed index still matches the scripts on disk, which is the one thing
+about adding a script that is easy to forget and impossible to notice by ear.
 """
 
 from __future__ import annotations
@@ -129,30 +132,115 @@ def build(root: pathlib.Path, base_url: str, branch: str, version: str) -> str:
     return minidom.parseString(raw).toprettyxml(indent="  ", encoding="utf-8").decode()
 
 
+def default_version(root: pathlib.Path) -> str:
+    """The highest @version any script declares."""
+    versions = [h.get("version", "0.0.0") for _, h in collect(root)]
+    return max(versions, key=lambda v: [int(p) for p in
+                                        re.findall(r"\d+", v) or [0]])
+
+
+def target_from_index(path: pathlib.Path) -> tuple[str, str]:
+    """Recover the --url and --branch a committed index.xml was built with.
+
+    So --check needs no arguments: the answer is already in the file, and a
+    checker you have to hand the right answer to is one more thing to get
+    wrong.
+    """
+    root = ET.parse(path).getroot()
+    link = root.find("./metadata/link[@rel='website']")
+    url = (link.text or "").strip() if link is not None else ""
+    branch = ""
+    for src in root.iter("source"):
+        m = re.search(r"/raw/([^/]+)/", (src.text or "").strip())
+        if m:
+            branch = m.group(1)
+            break
+    return url, branch
+
+
+def source_files(node: ET.Element) -> set[str]:
+    """Every file path an index declares."""
+    return {src.get("file", "") for src in node.iter("source")}
+
+
+def check(root: pathlib.Path, url: str | None, branch: str | None,
+          version: str | None) -> int:
+    """Compare the committed index.xml with what the scripts on disk imply."""
+    path = root / "index.xml"
+    if not path.exists():
+        print("No index.xml here. Generate one with --url first.", file=sys.stderr)
+        return 1
+
+    found_url, found_branch = target_from_index(path)
+    url = url or found_url
+    branch = branch or found_branch or "main"
+    if not url:
+        print("index.xml records no website link, so the repository URL cannot "
+              "be inferred. Pass --url.", file=sys.stderr)
+        return 1
+
+    version = version or default_version(root)
+    expected = build(root, url, branch, version)
+
+    # Canonical XML with whitespace stripped, so pretty-printing that differs
+    # between Python versions can never fail a check that is about content.
+    if ET.canonicalize(expected, strip_text=True) == \
+            ET.canonicalize(from_file=str(path), strip_text=True):
+        print(f"index.xml is up to date: version {version}, "
+              f"{len(collect(root))} scripts.")
+        return 0
+
+    committed = ET.parse(path).getroot()
+    print("index.xml no longer matches the scripts in this repository.",
+          file=sys.stderr)
+
+    have, want = source_files(committed), source_files(ET.fromstring(expected))
+    for missing in sorted(want - have):
+        print(f"  missing from the index: {missing}", file=sys.stderr)
+    for extra in sorted(have - want):
+        print(f"  in the index but not on disk: {extra}", file=sys.stderr)
+
+    node = committed.find(".//version")
+    if node is not None and node.get("name") != version:
+        print(f"  version: the index says {node.get('name')}, "
+              f"the scripts say {version}", file=sys.stderr)
+
+    print("\nRegenerate it and commit the result:\n"
+          f"  python3 tools/build_index.py --url {url} --branch {branch}",
+          file=sys.stderr)
+    return 1
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--url", required=True,
+    ap.add_argument("--url", default=None,
                     help="repository web URL, e.g. https://github.com/OWNER/REPO")
-    ap.add_argument("--branch", default="main")
+    ap.add_argument("--branch", default=None, help="default: main")
     ap.add_argument("--version", default=None,
                     help="package version (default: highest @version found)")
     ap.add_argument("--root", default=".")
+    ap.add_argument("--check", action="store_true",
+                    help="write nothing; report whether index.xml is still current")
     args = ap.parse_args()
 
     root = pathlib.Path(args.root).resolve()
 
-    version = args.version
-    if version is None:
-        versions = [h.get("version", "0.0.0") for _, h in collect(root)]
-        version = max(versions, key=lambda v: [int(p) for p in
-                                               re.findall(r"\d+", v) or [0]])
+    if args.check:
+        return check(root, args.url, args.branch, args.version)
 
-    xml = build(root, args.url, args.branch, version)
+    if not args.url:
+        ap.error("--url is required when writing the index "
+                 "(--check infers it from the existing index.xml)")
+
+    version = args.version or default_version(root)
+
+    branch = args.branch or "main"
+    xml = build(root, args.url, branch, version)
     out = root / "index.xml"
     out.write_text(xml, encoding="utf-8")
     print(f"Wrote {out} (version {version}, {len(collect(root))} scripts).")
     print("Commit and push it, then the repository can be imported in ReaPack as:")
-    print(f"  {raw_url(args.url, args.branch, 'index.xml')}")
+    print(f"  {raw_url(args.url, branch, 'index.xml')}")
     return 0
 
 
