@@ -439,8 +439,19 @@ end
 
 do
   -- Off Windows a backslash is a legal filename character, not a separator.
+  --
+  -- This needs the same package.config swap as the Windows cases above, and
+  -- for the same reason in reverse. Run bare, it asserts non-Windows
+  -- behaviour against whatever platform the developer happens to be on, so
+  -- it passes on macOS and fails on Windows -- on the machine of the very
+  -- contributor these path tests were written for.
+  local real_config = package.config
+  package.config = '/\n;\n?\n!\n-\n'
+
   local b = a11y.basename('/tmp/odd\\name.RPP')
   check('backslash stays part of the name off Windows', b == 'odd\\name.RPP', b)
+
+  package.config = real_config
 end
 
 --------------------------------------------------------------------------

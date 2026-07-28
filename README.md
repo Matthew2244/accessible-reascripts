@@ -104,6 +104,50 @@ dialog per track. Put `#` where the number should go:
 Numbering follows track order, not the order you selected them. One undo step
 for the whole rename.
 
+### Automate plugin parameter by name
+
+Type part of a parameter's name and get an envelope for it, ready to edit.
+Searches every parameter of every plugin on the selected track, plus the
+track's own volume, pan, width and mute.
+
+Exposing a plugin parameter for automation normally means opening the FX
+parameters dialog, scrolling until you find the parameter, nudging it so it
+becomes the "last touched" one, closing the dialog, pressing the
+show-envelope-for-last-touched-parameter action, then cycling envelopes until
+you land on the right one. REAPER has `GetFXEnvelope`, which creates the
+envelope directly from an index, so none of that is necessary.
+
+The envelope is created if it does not exist, made visible, and selected, so
+OSARA's envelope point navigation acts on it straight away.
+
+### Ramp envelope over time selection
+
+Ramp the selected envelope from one value to another across the time
+selection: a fade, a filter sweep, a level move under a voiceover. Both values
+and the curve are asked for in one dialog, prefilled with what the envelope is
+doing now, so leaving a field alone changes nothing.
+
+Values are typed in the units you think in — decibels for volume, percent for
+pan, width and plugin parameters, 0 or 1 for mute. Curve shapes are words
+rather than numbers: `linear`, `slow`, `fast start`, `fast end`, `square`,
+`bezier`.
+
+It pins the value immediately before the time selection. Without that, REAPER
+interpolates the new ramp all the way back to the point it adds automatically
+at the start of the project, so the value drifts across everything before the
+span you chose. Pinning keeps each ramp local, which means you can run this
+over one span after another to build up a shape.
+
+### Speak automation state
+
+One spoken sentence describing the automation you are sitting in: the track and
+envelope, the track's automation mode, whether the envelope is armed and
+visible, how many points it has, the value under the edit cursor, how far the
+nearest points are on either side, and whether there is a time selection ready
+to ramp across.
+
+This script only reads. It changes nothing.
+
 ## Installing
 
 This repository is **private**, so install it by cloning. ReaPack cannot be

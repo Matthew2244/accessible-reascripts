@@ -54,8 +54,11 @@ sends.
 ## Adding a script
 
 Scripts live in a folder named for their category: `Tracks`, `Project`,
-`Navigation`. Add a folder if none fits. File names start with `a11y_` and
-describe the action in plain words.
+`Navigation`, `Envelopes`. Add a folder if none fits, and add it to
+`SCRIPT_DIRS` in `tools/build_index.py` in the same commit — that list is
+hardcoded, so a folder missing from it is skipped silently and
+`build_index.py --check` still reports the index up to date. File names start
+with `a11y_` and describe the action in plain words.
 
 Start from this skeleton:
 
