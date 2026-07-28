@@ -1,0 +1,176 @@
+# Contributing
+
+Contributions are welcome, including from people using an AI assistant to
+write them. This document is written to be complete enough that an assistant
+can extend the project correctly from this file alone, without having seen the
+conversation that started it.
+
+## The two rules
+
+Everything else is a preference. These two are not.
+
+**1. Speak the outcome.** A script that silently succeeds leaves a screen
+reader user guessing whether it ran. Every path through a script ends in
+speech: success, cancellation, and failure. Use `a11y.speak` for success and
+`a11y.abort` for anything that stops early.
+
+**2. Never draw your own GUI.** REAPER's `gfx` windows are not exposed to
+VoiceOver or NVDA. Neither are `gfx.showmenu` popups. Only use native dialogs:
+`reaper.GetUserInputs` and `reaper.ShowMessageBox`, both wrapped in
+`Lib/a11y.lua` as `a11y.prompt`, `a11y.pick` and `a11y.confirm`.
+
+If you need the user to choose from a list, use `a11y.pick`. It speaks a
+numbered list and asks for a number. This is deliberately not a popup menu.
+
+## Some further guidance
+
+**Do not reimplement what REAPER or SWS already does.** Check the action list
+first. REAPER has a native `File: Save new version of project`, and SWS has
+`Xenakios/SWS: Rename selected tracks`. Where a native action already does the
+work but does not say what happened, the useful contribution is a small script
+that speaks the result, which the user can chain after it in a custom action —
+not a reimplementation.
+
+**Say when something failed.** If an operation did not do what it claimed,
+say so plainly and include enough detail to report it as a bug. Never speak a
+success message you have not verified. `a11y_Insert track template by name.lua`
+counts tracks before and after and refuses to claim success if nothing changed;
+copy that habit.
+
+**Wrap edits in one undo block.** `reaper.Undo_BeginBlock()` and
+`reaper.Undo_EndBlock(description, -1)`. One keystroke should be one undo.
+
+**Prefer letting REAPER do the work.** For example, track templates are
+inserted with `reaper.Main_openProject`, because REAPER's own loader handles
+track GUIDs, folder depth, routing and envelopes. Reconstructing that by
+editing state chunks looks tempting and breaks on any template containing
+sends.
+
+## Adding a script
+
+Scripts live in a folder named for their category: `Tracks`, `Project`,
+`Navigation`. Add a folder if none fits. File names start with `a11y_` and
+describe the action in plain words.
+
+Start from this skeleton:
+
+```lua
+--[[
+  @description What it does (accessible)
+  @author Accessible ReaScripts contributors
+  @version 1.0.0
+  @provides [main] .
+  @about
+    A few lines a stranger can read to decide whether they want this.
+    Say what it changes, and what it leaves alone.
+]]
+
+local script_dir = ({ reaper.get_action_context() })[2]:match('^(.*[\\/])')
+package.path = script_dir .. '../Lib/?.lua;' .. package.path
+local loaded, a11y = pcall(require, 'a11y')
+if not loaded then
+  local m = 'Accessible ReaScripts: could not load the shared library Lib/a11y.lua. ' ..
+            'Make sure the Lib folder sits next to the script folders.'
+  if reaper.osara_outputMessage then reaper.osara_outputMessage(m) end
+  reaper.ShowMessageBox(m, 'Accessible ReaScripts', 0)
+  return
+end
+
+local function main()
+  -- Work here. Call a11y.abort('...') to stop with a spoken reason.
+  a11y.speak('Done.')
+end
+
+a11y.run(main)
+```
+
+`a11y.run` exists so `a11y.abort` can stop a script from anywhere without the
+error surfacing as a crash. Real errors are still re-raised, so genuine bugs
+appear in the ReaScript console rather than vanishing.
+
+## What is in the library
+
+`Lib/a11y.lua`, all documented inline:
+
+- Speech: `speak`, `abort`, `run`, `has_osara`
+- Text: `plural`, `list_phrase`, `duration_phrase`, `number_pattern`
+- Matching: `score`, `filter`
+- Dialogs: `prompt`, `pick`, `confirm`
+- Files: `sep`, `path_join`, `basename`, `scan_files`
+- Persistence between runs: `remember`, `recall`
+
+Put reusable pure logic in the library rather than in a script, so it can be
+tested without REAPER.
+
+## Testing
+
+```bash
+lua tools/test_a11y.lua && python3 tools/check_api.py
+```
+
+Both run in a terminal with REAPER closed.
+
+`tools/test_a11y.lua` tests the library's pure logic against a stubbed
+`reaper` table. Search ranking is the part most worth testing: a search that
+puts the wrong template first is worse than no search, because you insert
+eighteen tracks of a big band before you notice. Add a case for any ranking
+behaviour you rely on.
+
+By default the ranking tests run against a small built-in sample of template
+names. To exercise them against your own collection instead — which is a much
+better test, because real names are messier — dump it into a fixture:
+
+```bash
+mkdir -p tools/fixtures
+ls "$HOME/Library/Application Support/REAPER/TrackTemplates"/*.RTrackTemplate \
+  | sed 's|.*/||; s|\.RTrackTemplate$||' > tools/fixtures/track_templates.txt
+```
+
+That file is git-ignored. Template names tend to include collaborators' and
+clients' names, so it stays on your machine.
+
+`tools/check_api.py` verifies every `reaper.*` name in the repo really exists.
+It reads the names REAPER and the installed extensions register, so it catches
+misspellings, which are otherwise nasty: Lua evaluates `reaper.CountTraks(0)`
+to `nil` and then dies at runtime, in a dialog, halfway through an edit.
+
+Anything that touches a real project still needs testing by hand in REAPER,
+with a scratch project. Say in your pull request what you tested and on which
+REAPER version.
+
+## Finding out what an API actually does
+
+REAPER's own documentation is not always to hand, and the online copies are
+sometimes behind a login. The binaries carry their own documentation, and you
+can read it:
+
+```bash
+python3 - <<'PY'
+data = open('/Applications/REAPER.app/Contents/MacOS/REAPER', 'rb').read()
+toks = [t.decode('utf-8', 'replace') for t in data.split(b'\x00')]
+for i, t in enumerate(toks):
+    if t == 'Main_openProject':
+        print([x for x in toks[i:i+4] if 0 < len(x) < 500])
+        break
+PY
+```
+
+That prints the argument types, the argument names and the help text for the
+function. It is how the track template script was written, and how the
+`osara_outputMessage` signature was confirmed — OSARA registers it for
+ReaScript but does not mention it in its readme.
+
+The same trick works on extensions; they register names as `API_<Name>` and
+document them as `APIdef_<Name>`.
+
+## Style
+
+Match the surrounding code. Two-space indent, `snake_case` for locals,
+single quotes for Lua strings. Comments explain why something is done, not
+what the line says — particularly where the obvious approach is wrong, since
+that is what saves the next person an afternoon.
+
+Write for the ear. Spoken messages are prose, not log lines: "Inserted piano
+1. Track 4, UADx Ravel Grand Piano." Avoid abbreviations a screen reader will
+mangle, and avoid `track(s)`, which is read aloud as "track parenthesis s" —
+`a11y.plural` exists for this.

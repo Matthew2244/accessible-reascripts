@@ -1,0 +1,9 @@
+.DS_Store
+*.swp
+*~
+
+# Your own track template names, used to test search ranking against a
+# realistic corpus. Personal to your setup, so it stays out of the repo.
+# Generate yours with the command in CONTRIBUTING.md; the tests fall back to
+# a built-in sample when it is absent.
+tools/fixtures/

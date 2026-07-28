@@ -1,0 +1,151 @@
+# Accessible ReaScripts
+
+Scripts that make REAPER faster to use with a screen reader.
+
+Every script here speaks its result out loud through OSARA, and none of them
+draw their own windows — REAPER's `gfx` windows are invisible to VoiceOver and
+NVDA, so this collection only ever uses native dialogs that screen readers
+already read correctly.
+
+Built and tested on macOS with VoiceOver. Nothing in it is macOS-specific, so
+it should work on Windows with NVDA; if you try it there, please say how it
+went.
+
+## Requirements
+
+- REAPER 6.44 or newer (developed against 7.78)
+- [OSARA](https://osara.reaperaccessibility.com/) — required, this is what
+  does the speaking
+- [SWS](https://www.sws-extension.org/) — not required, but recommended
+- [ReaPack](https://reapack.com/) — optional, only for installing via the
+  package manager
+
+The quickest way to get all of these at once is
+[RABBIT](https://github.com/Timtam/rabbit), which installs REAPER, OSARA, SWS,
+ReaPack and ReaKontrol in one go.
+
+## The scripts
+
+### Insert track template by name
+
+Type part of a track template's name and insert it, instead of arrowing
+through the Track Templates submenu. If you have 170 templates, this is the
+difference between two keystrokes and two minutes.
+
+Search is forgiving. All of these find `keyscape rhodes suitcase`:
+
+- `keyscape rhodes suitcase` — the whole name
+- `rhodes suit` — several words, in any order
+- `suitcase` — a word from the middle
+- `krs` — the first letter of each word
+
+An exact name always wins, so searching `piano 1` inserts `piano 1` and not
+`piano 1 gospel`.
+
+When more than one template matches, the matches are spoken as a numbered
+list and you type the number you want. The newly inserted tracks are left
+selected, so whatever you do next lands on them. The whole insert is one undo
+step.
+
+### Go to marker or region by name
+
+Jump straight to a marker or region by typing part of its name, rather than
+stepping through them one at a time. You can also just type a marker's number.
+
+Choosing a region sets the time selection to that region as well as moving the
+edit cursor, so you can play or render it immediately. Markers only move the
+cursor.
+
+### Speak project summary
+
+One keystroke, and you hear: project name and version, whether there are
+unsaved changes, tempo and time signature at the cursor, project length, track
+and item counts, how many markers and regions, and — the part that is genuinely
+hard to notice by ear — how many items point at media files that are missing
+from disk.
+
+This script only reads. It changes nothing.
+
+It is useful in a custom action straight after
+`File: Save new version of project`, so you hear which version you just landed
+on.
+
+### Rename selected tracks
+
+Rename every selected track from one dialog, instead of confirming a separate
+dialog per track. Put `#` where the number should go:
+
+- `Vox #` produces Vox 1, Vox 2, Vox 3
+- `Tom ##` produces Tom 01, Tom 02 — `##` pads to two digits
+- `Kick` produces Kick 1, Kick 2 — `#` is added automatically when you are
+  renaming several tracks
+- `Kick` stays Kick when only one track is selected
+
+Numbering follows track order, not the order you selected them. One undo step
+for the whole rename.
+
+## Installing
+
+### With ReaPack (recommended for most people)
+
+1. In REAPER, go to Extensions, ReaPack, Import repositories.
+2. Paste the repository index URL:
+   `https://github.com/OWNER/accessible-reascripts/raw/main/index.xml`
+3. Go to Extensions, ReaPack, Browse packages, and install
+   "Accessible ReaScripts".
+
+Replace `OWNER` with wherever this repository actually lives.
+
+### From a local copy (recommended if you want to edit the scripts)
+
+Clone the repository, then point REAPER at it with a symbolic link, so your
+edits are live without copying files around each time:
+
+```bash
+git clone https://github.com/OWNER/accessible-reascripts.git ~/accessible-reascripts
+ln -s ~/accessible-reascripts "$HOME/Library/Application Support/REAPER/Scripts/accessible-reascripts"
+```
+
+On Windows the Scripts folder is under `%APPDATA%\REAPER\Scripts`.
+
+Keep the `Lib` folder next to the script folders. Every script loads
+`Lib/a11y.lua` from one level up, and will say so out loud if it cannot find
+it.
+
+## Loading the scripts and assigning shortcuts
+
+REAPER does not pick up script files on its own — each one has to be added to
+the action list once:
+
+1. Press the key for Actions, show action list.
+2. Choose New action, then Load ReaScript.
+3. Select the `.lua` files you want. You can select several at once.
+4. Find the action in the list, choose Add, and press the shortcut you want.
+
+Shortcuts are personal, so this collection deliberately does not ship any.
+Worth knowing: OSARA's own key map already claims a lot of combinations, so
+check a shortcut is free before committing to it.
+
+These scripts are also designed to be chained. `Speak project summary` after
+`File: Save new version of project` in a single custom action is a good
+example — REAPER does the work, the script tells you what happened.
+
+## Development
+
+Two checks, both runnable from a terminal without opening REAPER:
+
+```bash
+lua tools/test_a11y.lua && python3 tools/check_api.py
+```
+
+`test_a11y.lua` covers the pure logic — search ranking, numbering patterns,
+spoken phrasing. `check_api.py` reads the REAPER and extension binaries and
+verifies that every `reaper.*` name used in the repo actually exists, which
+catches the misspellings that otherwise only surface as a runtime error
+mid-edit.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) before adding a script.
+
+## Licence
+
+MIT. See [LICENSE](LICENSE).
