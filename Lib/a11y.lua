@@ -102,6 +102,76 @@ function a11y.duration_phrase(seconds)
 end
 
 --------------------------------------------------------------------------
+-- Envelope values
+--------------------------------------------------------------------------
+-- Envelope points are stored in whatever scale the envelope uses, which is
+-- rarely the scale anyone thinks in. Volume is linear gain; people think in
+-- decibels. Plugin parameters are normalised 0 to 1; people think in percent.
+-- Converting in the script means every envelope script gets it subtly
+-- different, so it lives here where it can be tested without Reaper.
+
+--- Quietest decibel value we represent. Below this, gain is treated as
+--- silence, because the conversion runs to negative infinity and a spoken
+--- "minus infinity dB" helps nobody.
+a11y.MIN_DB = -150
+
+--- Linear gain to decibels. Silence floors at a11y.MIN_DB rather than
+--- returning -inf, which formats as "-inf" and reads badly aloud.
+function a11y.gain_to_db(gain)
+  if not gain or gain <= 0 then return a11y.MIN_DB end
+  local db = 20 * (math.log(gain) / math.log(10))
+  if db < a11y.MIN_DB then return a11y.MIN_DB end
+  return db
+end
+
+--- Decibels back to linear gain.
+function a11y.db_to_gain(db)
+  if not db or db <= a11y.MIN_DB then return 0 end
+  return 10 ^ (db / 20)
+end
+
+-- Point shapes, as the integers InsertEnvelopePoint expects. Each entry
+-- lists the words a user might reasonably type for it.
+local SHAPES = {
+  { id = 0, name = 'linear',              words = { 'linear', 'lin', 'straight' } },
+  { id = 1, name = 'square',              words = { 'square', 'hold', 'step' } },
+  { id = 2, name = 'slow start and end',  words = { 'slow', 'smooth', 'ease' } },
+  { id = 3, name = 'fast start',          words = { 'fast start', 'faststart', 'start' } },
+  { id = 4, name = 'fast end',            words = { 'fast end', 'fastend', 'end' } },
+  { id = 5, name = 'bezier',              words = { 'bezier', 'bez' } },
+}
+
+--- Parse a curve shape from plain words, so nobody has to remember that
+--- "fast end" is 4. Unrecognised text becomes linear, which is the shape
+--- someone typing a guess almost always wanted.
+--
+-- Two details keep the bare 'start' and 'end' keywords from misfiring.
+-- Exact matches are tried across every shape before any substring match, so
+-- 'fast end' resolves on its own name rather than being caught by the
+-- 'start' keyword listed under fast start. And the substring pass walks the
+-- table in order, so 'slow start and end' meets 'slow' before it can meet
+-- either 'start' or 'end'. Reordering SHAPES would break that second one.
+-- @return number shape id, string spoken name
+function a11y.envelope_shape(text)
+  local q = (text or ''):lower():gsub('^%s+', ''):gsub('%s+$', '')
+  if q == '' then return 0, 'linear' end
+
+  for _, shape in ipairs(SHAPES) do
+    for _, word in ipairs(shape.words) do
+      if q == word then return shape.id, shape.name end
+    end
+  end
+
+  for _, shape in ipairs(SHAPES) do
+    for _, word in ipairs(shape.words) do
+      if q:find(word, 1, true) then return shape.id, shape.name end
+    end
+  end
+
+  return 0, 'linear'
+end
+
+--------------------------------------------------------------------------
 -- Fuzzy matching
 --------------------------------------------------------------------------
 -- Scoring is deliberately simple and explainable, because a search that

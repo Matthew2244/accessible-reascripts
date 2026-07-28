@@ -32,7 +32,7 @@ from xml.dom import minidom
 
 PACKAGE_NAME = "Accessible ReaScripts"
 CATEGORY = "Accessible ReaScripts"
-SCRIPT_DIRS = ("Tracks", "Project", "Navigation")
+SCRIPT_DIRS = ("Tracks", "Project", "Navigation", "Envelopes")
 LIB_FILES = ("Lib/a11y.lua",)
 
 
