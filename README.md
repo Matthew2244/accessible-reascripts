@@ -174,17 +174,25 @@ example — REAPER does the work, the script tells you what happened.
 
 ## Development
 
-Two checks, both runnable from a terminal without opening REAPER:
+Three checks, all runnable from a terminal without opening REAPER:
 
 ```bash
-lua tools/test_a11y.lua && python3 tools/check_api.py
+lua tools/test_a11y.lua && python3 tools/check_api.py && python3 tools/build_index.py --check
 ```
 
 `test_a11y.lua` covers the pure logic — search ranking, numbering patterns,
 spoken phrasing. `check_api.py` reads the REAPER and extension binaries and
 verifies that every `reaper.*` name used in the repo actually exists, which
 catches the misspellings that otherwise only surface as a runtime error
-mid-edit.
+mid-edit. `build_index.py --check` confirms `index.xml` still lists every
+script, which is the easiest thing to forget when adding one and impossible to
+notice by ear.
+
+GitHub Actions runs the first and last of those on every push and pull request,
+plus a compile check of every `.lua` file. It cannot run `check_api.py` —
+that one needs REAPER installed — so run it yourself before opening a pull
+request. Nothing automated tests behaviour inside REAPER; that still takes a
+scratch project.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) before adding a script.
 

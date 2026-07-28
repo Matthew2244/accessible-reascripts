@@ -1,0 +1,4 @@
+# Blank issues stay on. The templates are a prompt for what is useful to
+# include, not a gate — a one-line report is better than a report nobody
+# bothers to file.
+blank_issues_enabled: true

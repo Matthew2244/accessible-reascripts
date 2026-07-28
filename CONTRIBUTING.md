@@ -5,6 +5,11 @@ write them. This document is written to be complete enough that an assistant
 can extend the project correctly from this file alone, without having seen the
 conversation that started it.
 
+There is also a [CLAUDE.md](CLAUDE.md) at the repository root, which Claude
+Code picks up on its own when you open the repo. It is the short version — the
+two rules, the commands that verify a change, and the handful of facts that
+cost an afternoon each to rediscover. This file remains the reference.
+
 ## The two rules
 
 Everything else is a preference. These two are not.
@@ -105,10 +110,17 @@ tested without REAPER.
 ## Testing
 
 ```bash
-lua tools/test_a11y.lua && python3 tools/check_api.py
+lua tools/test_a11y.lua && python3 tools/check_api.py && python3 tools/build_index.py --check
 ```
 
-Both run in a terminal with REAPER closed.
+All three run in a terminal with REAPER closed.
+
+GitHub Actions runs the first and third on every pull request, along with a
+compile check of every `.lua` file — the test suite only loads
+`Lib/a11y.lua`, so without that a syntax error in a script would stay hidden
+until someone pressed the shortcut and heard nothing. `check_api.py` is not in
+CI, because it works by reading the REAPER and OSARA binaries and neither can
+be installed on a runner. Run it locally.
 
 `tools/test_a11y.lua` tests the library's pure logic against a stubbed
 `reaper` table. Search ranking is the part most worth testing: a search that
@@ -136,7 +148,14 @@ to `nil` and then dies at runtime, in a dialog, halfway through an edit.
 
 Anything that touches a real project still needs testing by hand in REAPER,
 with a scratch project. Say in your pull request what you tested and on which
-REAPER version.
+REAPER version — the pull request template asks for exactly this, because it
+is the one thing a reviewer cannot find out any other way.
+
+If you add a script, regenerate the ReaPack index in the same commit:
+
+```bash
+python3 tools/build_index.py --url https://github.com/Matthew2244/accessible-reascripts --branch main
+```
 
 ## Finding out what an API actually does
 
