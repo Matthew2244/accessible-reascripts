@@ -106,27 +106,49 @@ for the whole rename.
 
 ## Installing
 
-### With ReaPack (recommended for most people)
+This repository is **private**, so install it by cloning. ReaPack cannot be
+used while it stays private: ReaPack fetches the index over a plain HTTPS
+request with no way to send a GitHub token, so a private repository just
+returns "not found" to it.
 
-1. In REAPER, go to Extensions, ReaPack, Import repositories.
-2. Paste the repository index URL:
-   `https://github.com/OWNER/accessible-reascripts/raw/main/index.xml`
-3. Go to Extensions, ReaPack, Browse packages, and install
-   "Accessible ReaScripts".
+An `index.xml` is generated and committed anyway, so if the repository is ever
+made public, ReaPack works immediately with no further setup.
 
-Replace `OWNER` with wherever this repository actually lives.
+### Clone and link
 
-### From a local copy (recommended if you want to edit the scripts)
+You need access to the repository — ask Matthew for an invite — and a GitHub
+account with `gh` or an SSH key set up.
 
-Clone the repository, then point REAPER at it with a symbolic link, so your
-edits are live without copying files around each time:
+Clone it, then point REAPER at it with a symbolic link, so edits are live
+without copying files around each time:
 
 ```bash
-git clone https://github.com/OWNER/accessible-reascripts.git ~/accessible-reascripts
+git clone https://github.com/Matthew2244/accessible-reascripts.git ~/accessible-reascripts
 ln -s ~/accessible-reascripts "$HOME/Library/Application Support/REAPER/Scripts/accessible-reascripts"
 ```
 
-On Windows the Scripts folder is under `%APPDATA%\REAPER\Scripts`.
+On Windows the Scripts folder is under `%APPDATA%\REAPER\Scripts`, and you can
+make the link with:
+
+```
+mklink /D "%APPDATA%\REAPER\Scripts\accessible-reascripts" "%USERPROFILE%\accessible-reascripts"
+```
+
+Update later with `git pull` in that folder. Nothing needs reinstalling; the
+symbolic link means REAPER is already reading the new files.
+
+### If it is ever made public
+
+Regenerate the index and push it:
+
+```bash
+python3 tools/build_index.py --url https://github.com/Matthew2244/accessible-reascripts --branch main
+```
+
+Then anyone can add it in REAPER under Extensions, ReaPack, Import
+repositories, using:
+
+`https://github.com/Matthew2244/accessible-reascripts/raw/main/index.xml`
 
 Keep the `Lib` folder next to the script folders. Every script loads
 `Lib/a11y.lua` from one level up, and will say so out loud if it cannot find

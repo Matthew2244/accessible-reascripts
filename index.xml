@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<index version="1" name="Accessible ReaScripts">
+  <category name="Accessible ReaScripts">
+    <reapack name="Accessible ReaScripts" type="script" desc="Accessible ReaScripts">
+      <version name="1.0.0" author="Accessible ReaScripts contributors">
+        <source main="main" file="Tracks/a11y_Add FX by name.lua">https://github.com/Matthew2244/accessible-reascripts/raw/main/Tracks/a11y_Add%20FX%20by%20name.lua</source>
+        <source main="main" file="Tracks/a11y_Insert track template by name.lua">https://github.com/Matthew2244/accessible-reascripts/raw/main/Tracks/a11y_Insert%20track%20template%20by%20name.lua</source>
+        <source main="main" file="Tracks/a11y_Rename selected tracks.lua">https://github.com/Matthew2244/accessible-reascripts/raw/main/Tracks/a11y_Rename%20selected%20tracks.lua</source>
+        <source main="main" file="Project/a11y_Speak project summary.lua">https://github.com/Matthew2244/accessible-reascripts/raw/main/Project/a11y_Speak%20project%20summary.lua</source>
+        <source main="main" file="Navigation/a11y_Go to marker or region by name.lua">https://github.com/Matthew2244/accessible-reascripts/raw/main/Navigation/a11y_Go%20to%20marker%20or%20region%20by%20name.lua</source>
+        <source file="Lib/a11y.lua">https://github.com/Matthew2244/accessible-reascripts/raw/main/Lib/a11y.lua</source>
+      </version>
+      <metadata>
+        <description>Scripts that make REAPER faster to use with a screen reader.
+
+Every script speaks its result through OSARA, and none of them draw their own windows, so everything stays readable by VoiceOver and NVDA.
+
+Included:
+- Add FX by name to selected tracks (accessible)
+- Insert track template by name (accessible)
+- Rename selected tracks with a numbered pattern (accessible)
+- Speak project summary (accessible)
+- Go to marker or region by name (accessible)
+
+Requires OSARA. SWS is recommended.</description>
+      </metadata>
+    </reapack>
+  </category>
+  <metadata>
+    <link rel="website">https://github.com/Matthew2244/accessible-reascripts</link>
+  </metadata>
+</index>
