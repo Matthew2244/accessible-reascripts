@@ -105,19 +105,43 @@ end
 -- Fuzzy matching
 --------------------------------------------------------------------------
 -- Scoring is deliberately simple and explainable, because a search that
--- surprises you is worse than one that is merely blunt. Higher is better;
--- nil means no match at all.
+-- surprises you is worse than one that is merely blunt.
 --
--- Tiers, in order:
---   exact                    1000
---   prefix                    900 - length penalty
---   word-start ("rho" in "keyscape rhodes")   800 - penalty
---   substring anywhere        700 - penalty
---   initials  ("krs" -> "keyscape rhodes suitcase")  600 - penalty
---   subsequence in order      500 - penalty
+-- Every match lands in a numbered tier, best first:
 --
--- The length penalty breaks ties toward shorter names, so searching
--- "piano 1" prefers "piano 1" over "piano 1 gospel".
+--   1  exact
+--   2  prefix                  "key"   -> "keyscape rhodes"
+--   3  word-start              "rho"   -> "keyscape rhodes"
+--   4  substring anywhere      "hode"  -> "keyscape rhodes"
+--   5  all query words present "rhodes amp" -> "keyscape rhodes 2 amped"
+--   6  consecutive initials    "krs"   -> "keyscape rhodes suitcase"
+--   7  loose subsequence       "kysc"  -> "keyscape"
+--
+-- Tiers 6 and 7 are FALLBACKS. They only appear when nothing matched at
+-- tier 5 or better -- see a11y.filter. This matters enormously once the
+-- list is large: over ~2000 plugin names, a bare subsequence search for
+-- "ssl" matches 472 of them, because almost any name has an s, an s and
+-- an l somewhere in it. Useful on a short list, useless noise on a long
+-- one, so it is kept but held in reserve.
+--
+-- Tier 7 additionally requires the matched characters to sit reasonably
+-- close together, so "valhalla" does not match "elysia alpha mix" by
+-- scavenging one letter at a time across the whole string.
+--
+-- Score is (8 - tier) * 1000 minus a small length penalty, so tiers never
+-- overlap and, within a tier, the shorter name wins. That is what makes
+-- "piano 1" rank above "piano 1 gospel".
+
+local TIER_EXACT, TIER_PREFIX, TIER_WORD_START = 1, 2, 3
+local TIER_SUBSTRING, TIER_ALL_WORDS = 4, 5
+local TIER_INITIALS, TIER_SUBSEQUENCE = 6, 7
+
+--- Tiers above this number are fallbacks, used only when nothing better matched.
+local LOOSEST_STRICT_TIER = TIER_ALL_WORDS
+
+--- Shortest query allowed to match by subsequence. Below this, a query is
+--- too small to mean anything at that tier.
+local MIN_SUBSEQUENCE_QUERY = 3
 
 local function escape_pattern(s)
   return (s:gsub('([%^%$%(%)%%%.%[%]%*%+%-%?])', '%%%1'))
@@ -130,87 +154,130 @@ local function words_of(s)
   return out
 end
 
---- Do the characters of `q` appear in `s` in order?
-local function is_subsequence(q, s)
-  local i = 1
+--- Find `q` as a subsequence of `s`.
+-- @return start position, end position -- or nil when there is no match.
+local function subsequence_span(q, s)
+  local first, i = nil, 1
   for c = 1, #q do
-    local ch = q:sub(c, c)
-    local found = s:find(ch, i, true)
-    if not found then return false end
+    local found = s:find(q:sub(c, c), i, true)
+    if not found then return nil end
+    if first == nil then first = found end
     i = found + 1
   end
-  return true
+  return first, i - 1
 end
 
---- Does `q` match the leading letters of consecutive words in `s`?
-local function matches_initials(q, s)
-  local initials = {}
-  for _, w in ipairs(words_of(s)) do initials[#initials + 1] = w:sub(1, 1) end
-  return is_subsequence(q, table.concat(initials))
+--- The first letter of each word, joined: "keyscape rhodes 2" -> "kr2".
+local function initials_of(s)
+  local out = {}
+  for _, w in ipairs(words_of(s)) do out[#out + 1] = w:sub(1, 1) end
+  return table.concat(out)
 end
 
---- Score `candidate` against `query`. Returns a number, or nil for no match.
+--- Score `candidate` against `query`.
+-- @return number score, number tier  -- or nil when there is no match.
 function a11y.score(query, candidate)
   query = (query or ''):lower():gsub('^%s+', ''):gsub('%s+$', '')
   local cand = (candidate or ''):lower()
-  if query == '' then return 1 end -- empty query matches everything, flatly
+  if query == '' then return 1, TIER_EXACT end -- empty query matches everything
   if cand == '' then return nil end
 
-  -- Length penalty is capped so a very long name is never ranked below a
-  -- worse-tier match purely for being long.
+  -- Capped so a very long name is never pushed below a worse tier purely
+  -- for being long.
   local penalty = math.min(#cand, 99)
+  local function score_for(tier) return (8 - tier) * 1000 - penalty end
 
-  if cand == query then return 1000 end
-  if cand:sub(1, #query) == query then return 900 - penalty end
-
-  -- Word-start: query begins one of the words.
-  for _, w in ipairs(words_of(cand)) do
-    if w:sub(1, #query) == query then return 800 - penalty end
+  if cand == query then return score_for(TIER_EXACT), TIER_EXACT end
+  if cand:sub(1, #query) == query then
+    return score_for(TIER_PREFIX), TIER_PREFIX
   end
 
-  if cand:find(escape_pattern(query)) then return 700 - penalty end
+  for _, w in ipairs(words_of(cand)) do
+    if w:sub(1, #query) == query then
+      return score_for(TIER_WORD_START), TIER_WORD_START
+    end
+  end
 
-  -- Multi-word query: every word must appear somewhere. This makes
-  -- "rhodes amp" find "keyscape rhodes 2 amped chorus pan".
+  if cand:find(escape_pattern(query)) then
+    return score_for(TIER_SUBSTRING), TIER_SUBSTRING
+  end
+
+  -- Every word of a multi-word query must appear somewhere, in any order.
   local qwords = words_of(query)
   if #qwords > 1 then
     local all = true
     for _, qw in ipairs(qwords) do
       if not cand:find(escape_pattern(qw)) then all = false break end
     end
-    if all then return 650 - penalty end
+    if all then return score_for(TIER_ALL_WORDS), TIER_ALL_WORDS end
   end
 
   local qcompact = query:gsub('%s+', '')
-  if matches_initials(qcompact, cand) then return 600 - penalty end
-  if is_subsequence(qcompact, cand:gsub('%s+', '')) then return 500 - penalty end
+
+  -- Initials must be consecutive words, not merely scattered ones, so
+  -- "krs" finds "keyscape rhodes suitcase" without also finding every
+  -- name that happens to contain those three initials somewhere.
+  if #qcompact >= 2 and initials_of(cand):find(qcompact, 1, true) then
+    return score_for(TIER_INITIALS), TIER_INITIALS
+  end
+
+  if #qcompact >= MIN_SUBSEQUENCE_QUERY then
+    local compact = cand:gsub('%s+', '')
+    local first, last = subsequence_span(qcompact, compact)
+    if first then
+      -- Require the letters to be reasonably close together. Without this,
+      -- an eight-letter query can strip one letter at a time from a
+      -- forty-character name and call it a match.
+      local span = last - first + 1
+      if span <= math.max(#qcompact * 3, #qcompact + 6) then
+        return score_for(TIER_SUBSEQUENCE), TIER_SUBSEQUENCE
+      end
+    end
+  end
 
   return nil
 end
 
 --- Filter and rank `items` against `query`.
+--
+-- Fallback tiers (initials, subsequence) are dropped entirely whenever any
+-- item matched at a strict tier. So a search that has real substring hits
+-- shows only those, and the loose tiers exist purely to rescue a search
+-- that would otherwise come back empty.
+--
 -- @param query string
 -- @param items table  list of items
 -- @param labelfn function|nil  item -> string (defaults to tostring)
 -- @return table  ranked list of items, best first
 function a11y.filter(query, items, labelfn)
   labelfn = labelfn or tostring
-  local scored = {}
+  local scored, has_strict = {}, false
+
   for i, item in ipairs(items) do
-    local s = a11y.score(query, labelfn(item))
+    local s, tier = a11y.score(query, labelfn(item))
     if s then
-      -- `order` keeps the sort stable, which keeps results predictable
-      -- between identical searches.
-      scored[#scored + 1] = { item = item, score = s, order = i }
+      if tier <= LOOSEST_STRICT_TIER then has_strict = true end
+      -- `order` keeps the sort stable, so identical searches stay in the
+      -- same order between runs.
+      scored[#scored + 1] = { item = item, score = s, tier = tier, order = i }
     end
   end
-  table.sort(scored, function(a, b)
+
+  local out = {}
+  for _, rec in ipairs(scored) do
+    if not has_strict or rec.tier <= LOOSEST_STRICT_TIER then
+      out[#out + 1] = rec
+    end
+  end
+
+  table.sort(out, function(a, b)
     if a.score ~= b.score then return a.score > b.score end
     return a.order < b.order
   end)
-  local out = {}
-  for i, rec in ipairs(scored) do out[i] = rec.item end
-  return out
+
+  local items_out = {}
+  for i, rec in ipairs(out) do items_out[i] = rec.item end
+  return items_out
 end
 
 --- Substitute each run of '#' in `pattern` with `number`, zero-padded to

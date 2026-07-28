@@ -47,6 +47,26 @@ list and you type the number you want. The newly inserted tracks are left
 selected, so whatever you do next lands on them. The whole insert is one undo
 step.
 
+### Add FX by name
+
+The same idea, for plugins. Type part of a plugin's name and add it to every
+selected track, instead of hunting through the FX browser.
+
+Plugin names include their format, so you can narrow by typing it:
+
+- `proq` finds every Pro-Q, in every format
+- `vst3 proq` finds only the VST3
+- `js loudness` finds only JSFX
+
+A plugin installed in more than one format appears once per format, so you
+choose deliberately rather than letting REAPER pick for you.
+
+It adds a new instance at the end of each selected track's chain, even if the
+same plugin is already there. One undo step for all tracks.
+
+Pairs well with OSARA's "View FX parameters for current track" in a custom
+action, if you want to start editing immediately after adding.
+
 ### Go to marker or region by name
 
 Jump straight to a marker or region by typing part of its name, rather than

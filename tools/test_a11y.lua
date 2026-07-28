@@ -137,6 +137,78 @@ check('drum search finds the plain setup first',
       first('drum setup') == 'drum setup', tostring(first('drum setup')))
 
 --------------------------------------------------------------------------
+-- Fallback tiers
+--------------------------------------------------------------------------
+-- These guard a real bug. The loose tiers were fine over 170 track template
+-- names and became useless noise over ~2000 plugin names: a subsequence
+-- search for "ssl" matched 472 of them, because nearly any name contains an
+-- s, an s and an l somewhere. Loose tiers are now held back unless nothing
+-- better matched, and subsequence matches must be reasonably compact.
+
+local fx = {
+  'VST3: Pro-Q 4 (FabFilter)', 'AU: FabFilter: Pro-Q 4',
+  'VST: FabFilter Pro-Q 4 (FabFilter)', 'AU: Waves: SSLEQ (m)',
+  'AU: Waves: SSLComp (m)', 'VST3: Scheps Omni Channel (Waves)',
+  'VST: elysia alpha mix (Plugin Alliance)',
+  'AU: Spectrasonics: Keyscape', 'AU: Apple: AUDelay',
+  'VST3: Shadow Hills Mastering Compressor (Plugin Alliance)',
+}
+
+do
+  -- "ssl" has real substring hits, so the scattered-letter matches that
+  -- also technically qualify must not be shown at all.
+  local hits = a11y.filter('ssl', fx)
+  local all_real = true
+  for _, h in ipairs(hits) do
+    if not h:lower():find('ssl') then all_real = false end
+  end
+  check('strict matches suppress loose ones', all_real, table.concat(hits, ' | '))
+  check('strict match count is small', #hits == 2, tostring(#hits))
+end
+
+do
+  -- Nothing here is a Valhalla plugin. Scavenging v-a-l-h-a-l-l-a across
+  -- "VST: elysia alpha mix (Plugin Alliance)" must not count.
+  local hits = a11y.filter('valhalla', fx)
+  check('absent plugin returns nothing rather than scattered noise',
+        #hits == 0, table.concat(hits, ' | '))
+end
+
+do
+  local hits = a11y.filter('proq', fx)
+  check('proq finds exactly the three Pro-Q formats', #hits == 3,
+        table.concat(hits, ' | '))
+end
+
+do
+  -- Loose tiers still rescue a search that would otherwise be empty.
+  local hits = a11y.filter('keysc', { 'Keyscape', 'unrelated thing' })
+  check('loose tier still rescues an otherwise empty search', #hits >= 1,
+        table.concat(hits, ' | '))
+end
+
+do
+  local _, tier = a11y.score('piano 1', 'piano 1')
+  check('score reports tier 1 for an exact match', tier == 1, tostring(tier))
+  local _, t2 = a11y.score('pia', 'piano 1')
+  check('score reports tier 2 for a prefix', t2 == 2, tostring(t2))
+end
+
+do
+  -- A two-character query is too short to mean anything by subsequence.
+  check('very short query does not match by subsequence',
+        a11y.score('xz', 'existing zebra material') == nil)
+end
+
+do
+  -- Initials must be consecutive words, not scattered through the name.
+  check('initials match consecutive words',
+        a11y.score('krs', 'keyscape rhodes suitcase') ~= nil)
+  check('initials do not match scattered words',
+        a11y.score('kzq', 'keyscape rhodes suitcase') == nil)
+end
+
+--------------------------------------------------------------------------
 -- Non-matches and edges
 --------------------------------------------------------------------------
 
