@@ -52,6 +52,26 @@ If you add a script, regenerate the index in the same commit:
 python3 tools/build_index.py --url https://github.com/Matthew2244/accessible-reascripts --branch main
 ```
 
+## Platforms
+
+The collection is developed on macOS with VoiceOver and has a contributor on
+Windows with NVDA. Nothing in the scripts is macOS-specific — they get their
+paths from `reaper.GetResourcePath()` and join them with `a11y.path_join`, so
+keep it that way and never hardcode a path.
+
+Two things to know before touching path handling:
+
+- **Both separators count on Windows.** REAPER returns backslashes, but a
+  project can reference media saved with forward slashes. `a11y.basename`
+  handles both, and `tools/test_a11y.lua` covers it by swapping
+  `package.config` — which means Windows path behaviour is testable from any
+  machine. Do that rather than assuming.
+- **`check_api.py` does not work on Windows yet.** Its symbol patterns come
+  from the macOS build's Itanium C++ mangling; MSVC mangles differently. It
+  detects the empty result and refuses to report rather than calling every name
+  broken, but a Windows contributor is effectively running two of the three
+  checks. Adding a Windows pattern to `names_from_reaper()` is an open job.
+
 ## Things that cost an afternoon to rediscover
 
 - **`reaper.osara_outputMessage(const char*)` is real but undocumented.** It is

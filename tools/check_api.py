@@ -21,12 +21,46 @@ Exit code 0 if every name resolves, 1 otherwise.
 from __future__ import annotations
 
 import argparse
+import os
 import pathlib
+import platform
 import re
 import sys
 
-DEFAULT_REAPER = "/Applications/REAPER.app/Contents/MacOS/REAPER"
-DEFAULT_PLUGINS = pathlib.Path.home() / "Library/Application Support/REAPER/UserPlugins"
+HOME = pathlib.Path.home()
+
+# First candidate that exists wins; --reaper and --plugins override both.
+REAPER_CANDIDATES = {
+    "Darwin": [
+        "/Applications/REAPER.app/Contents/MacOS/REAPER",
+        str(HOME / "Applications/REAPER.app/Contents/MacOS/REAPER"),
+    ],
+    "Windows": [
+        r"C:\Program Files\REAPER (x64)\reaper.exe",
+        r"C:\Program Files\REAPER\reaper.exe",
+        r"C:\Program Files (x86)\REAPER\reaper.exe",
+    ],
+    "Linux": ["/opt/REAPER/reaper", str(HOME / "opt/REAPER/reaper")],
+}
+
+PLUGIN_CANDIDATES = {
+    "Darwin": [HOME / "Library/Application Support/REAPER/UserPlugins"],
+    "Windows": [pathlib.Path(os.environ.get("APPDATA", HOME / "AppData/Roaming"))
+                / "REAPER" / "UserPlugins"],
+    "Linux": [HOME / ".config/REAPER/UserPlugins"],
+}
+
+# A real REAPER build registers many hundreds of names. Anything near zero
+# means the extraction failed, not that REAPER has no API -- and reporting a
+# result from that would mark almost every name in the repo as broken.
+MIN_PLAUSIBLE_API_NAMES = 200
+
+
+def first_existing(candidates) -> str | None:
+    for c in candidates:
+        if pathlib.Path(c).exists():
+            return str(c)
+    return None
 
 # Names used in the scripts that are provided by the ReaScript runtime
 # itself rather than registered as API functions.
@@ -50,6 +84,12 @@ def names_from_reaper(path: pathlib.Path) -> set[str]:
     greedily instead captures "CountTracksP9lua_State", which then fails to
     match anything the scripts use -- the whole repo looks broken while the
     checker is the thing at fault.
+
+    Both patterns come from the macOS build, where clang uses Itanium C++
+    mangling. The Windows build is compiled with MSVC, which mangles names a
+    different way entirely, so `P9lua_State` never appears there and this
+    returns an empty set. main() refuses to report a result in that case
+    rather than declaring every name broken -- see MIN_PLAUSIBLE_API_NAMES.
     """
     data = path.read_bytes()
     names: set[str] = set()
@@ -60,7 +100,11 @@ def names_from_reaper(path: pathlib.Path) -> set[str]:
 
 
 def names_from_extension(path: pathlib.Path) -> set[str]:
-    """Extensions register through `API_<Name>` / `APIdef_<Name>`."""
+    """Extensions register through `API_<Name>` / `APIdef_<Name>`.
+
+    These are plain strings rather than mangled symbols, so unlike
+    names_from_reaper this half works identically on every platform.
+    """
     data = path.read_bytes()
     return set(m.decode() for m in re.findall(rb"API_([A-Za-z_][A-Za-z0-9_]*)", data))
 
@@ -80,25 +124,57 @@ def used_names(root: pathlib.Path) -> dict[str, list[tuple[pathlib.Path, int]]]:
 
 
 def main() -> int:
+    system = platform.system()
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--reaper", default=DEFAULT_REAPER,
+    ap.add_argument("--reaper", default=None,
                     help="path to the REAPER executable")
-    ap.add_argument("--plugins", default=str(DEFAULT_PLUGINS),
+    ap.add_argument("--plugins", default=None,
                     help="path to the UserPlugins folder")
     ap.add_argument("--root", default=".", help="repo root to scan")
     args = ap.parse_args()
 
-    reaper_bin = pathlib.Path(args.reaper)
-    if not reaper_bin.exists():
-        print(f"REAPER binary not found at {reaper_bin}.", file=sys.stderr)
-        print("Pass --reaper /path/to/REAPER (inside REAPER.app/Contents/MacOS on macOS).",
+    candidates = REAPER_CANDIDATES.get(system, [])
+    found = args.reaper or first_existing(candidates)
+    if found is None:
+        print(f"REAPER not found on this {system} machine. Looked in:",
+              file=sys.stderr)
+        for c in candidates:
+            print(f"  {c}", file=sys.stderr)
+        print("Pass --reaper with the path to the executable "
+              "(inside REAPER.app/Contents/MacOS on macOS, reaper.exe on Windows).",
               file=sys.stderr)
         return 2
 
-    known = names_from_reaper(reaper_bin) | RUNTIME_NAMES
+    reaper_bin = pathlib.Path(found)
+    if not reaper_bin.exists():
+        print(f"REAPER binary not found at {reaper_bin}.", file=sys.stderr)
+        return 2
+
+    core = names_from_reaper(reaper_bin)
+    if len(core) < MIN_PLAUSIBLE_API_NAMES:
+        print(f"Only {len(core)} API names could be read out of {reaper_bin}, "
+              f"which is far too few to check against -- a real REAPER build "
+              f"registers many hundreds.", file=sys.stderr)
+        print("\nRefusing to report a result, because doing so would mark "
+              "almost every name in the repository as broken and none of it "
+              "would be true.", file=sys.stderr)
+        if system == "Windows":
+            print("\nThis is expected on Windows. The extraction patterns come "
+                  "from the macOS build, where clang uses Itanium C++ mangling "
+                  "(lua_CountTracksP9lua_State). MSVC mangles differently, so "
+                  "names_from_reaper() needs a Windows pattern adding before "
+                  "this check can work here.", file=sys.stderr)
+            print("\nThe other two checks are unaffected and worth running:\n"
+                  "  lua tools/test_a11y.lua\n"
+                  "  python3 tools/build_index.py --check", file=sys.stderr)
+        return 2
+
+    known = core | RUNTIME_NAMES
     sources = [f"REAPER ({len(known)} names)"]
 
-    plugins = pathlib.Path(args.plugins)
+    plugins = pathlib.Path(args.plugins or
+                           first_existing(PLUGIN_CANDIDATES.get(system, [])) or
+                           "/nonexistent")
     if plugins.is_dir():
         for dylib in sorted(plugins.glob("*.dylib")) + sorted(plugins.glob("*.so")) \
                 + sorted(plugins.glob("*.dll")):

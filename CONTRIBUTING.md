@@ -132,14 +132,36 @@ By default the ranking tests run against a small built-in sample of template
 names. To exercise them against your own collection instead — which is a much
 better test, because real names are messier — dump it into a fixture:
 
+On macOS:
+
 ```bash
 mkdir -p tools/fixtures
 ls "$HOME/Library/Application Support/REAPER/TrackTemplates"/*.RTrackTemplate \
   | sed 's|.*/||; s|\.RTrackTemplate$||' > tools/fixtures/track_templates.txt
 ```
 
+On Windows, in PowerShell:
+
+```powershell
+New-Item -ItemType Directory -Force tools\fixtures | Out-Null
+Get-ChildItem "$env:APPDATA\REAPER\TrackTemplates" -Recurse -Filter *.RTrackTemplate |
+  ForEach-Object { $_.BaseName } |
+  Set-Content -Encoding utf8 tools\fixtures\track_templates.txt
+```
+
 That file is git-ignored. Template names tend to include collaborators' and
 clients' names, so it stays on your machine.
+
+**`check_api.py` does not work on Windows yet.** It reads the API names out of
+the REAPER binary using symbol patterns taken from the macOS build, where clang
+uses Itanium C++ mangling. MSVC mangles differently, so the extraction comes up
+empty there. Rather than then declaring every name in the repo broken, it
+refuses to report at all and says so — but it does mean a Windows contributor
+is running two of the three checks, and the missing one is the misspelling
+catch. Adding a Windows pattern to `names_from_reaper()` is an open job and a
+genuinely useful contribution. Extension names are unaffected either way:
+extensions register `API_<Name>` as plain strings, which is platform
+independent.
 
 `tools/check_api.py` verifies every `reaper.*` name in the repo really exists.
 It reads the names REAPER and the installed extensions register, so it catches
@@ -165,7 +187,13 @@ can read it:
 
 ```bash
 python3 - <<'PY'
-data = open('/Applications/REAPER.app/Contents/MacOS/REAPER', 'rb').read()
+import os, platform
+BINARY = {
+    'Darwin':  '/Applications/REAPER.app/Contents/MacOS/REAPER',
+    'Windows': r'C:\Program Files\REAPER (x64)\reaper.exe',
+    'Linux':   '/opt/REAPER/reaper',
+}[platform.system()]
+data = open(BINARY, 'rb').read()
 toks = [t.decode('utf-8', 'replace') for t in data.split(b'\x00')]
 for i, t in enumerate(toks):
     if t == 'Main_openProject':
@@ -173,6 +201,8 @@ for i, t in enumerate(toks):
         break
 PY
 ```
+
+This one is plain string matching, so it works on every platform.
 
 That prints the argument types, the argument names and the help text for the
 function. It is how the track template script was written, and how the

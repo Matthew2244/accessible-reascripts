@@ -326,6 +326,46 @@ do
 end
 
 --------------------------------------------------------------------------
+-- Windows paths
+--------------------------------------------------------------------------
+-- a11y.sep() reads package.config on every call, so Windows behaviour can be
+-- exercised from any platform by swapping that string out. Worth doing
+-- properly: this collection has a Windows and NVDA contributor, and nobody
+-- developing it runs Windows, so these paths would otherwise only ever be
+-- tested by someone hearing them go wrong.
+
+do
+  local real_config = package.config
+  package.config = '\\\n;\n?\n!\n-\n'
+
+  check('sep is a backslash on Windows', a11y.sep() == '\\', a11y.sep())
+
+  local joined = a11y.path_join('C:', 'Users', 'tony')
+  check('path_join uses backslashes', joined == 'C:\\Users\\tony', joined)
+
+  local b1 = a11y.basename('C:\\Songs\\take_003.RPP')
+  check('basename handles a backslash path', b1 == 'take_003.RPP', b1)
+
+  -- Reaper returns backslashes, but a project can reference media saved with
+  -- forward slashes. Matching only the platform separator returns the whole
+  -- path, and that path is then spoken aloud.
+  local b2 = a11y.basename('C:/Songs/take_003.RPP')
+  check('basename handles a forward-slash path on Windows',
+        b2 == 'take_003.RPP', b2)
+
+  local b3 = a11y.basename('C:\\Songs\\take_003.RPP', true)
+  check('basename strips the extension on Windows', b3 == 'take_003', b3)
+
+  package.config = real_config
+end
+
+do
+  -- Off Windows a backslash is a legal filename character, not a separator.
+  local b = a11y.basename('/tmp/odd\\name.RPP')
+  check('backslash stays part of the name off Windows', b == 'odd\\name.RPP', b)
+end
+
+--------------------------------------------------------------------------
 
 print(string.format('%d passed, %d failed  (%d template names)', pass, fail, #names))
 for _, msg in ipairs(failures) do print('  FAIL: ' .. msg) end
