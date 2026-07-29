@@ -138,6 +138,32 @@ at the start of the project, so the value drifts across everything before the
 span you chose. Pinning keeps each ramp local, which means you can run this
 over one span after another to build up a shape.
 
+### Morph between two presets
+
+Pick a plugin, pick a preset to start from and a preset to end on, and every
+parameter that differs between them gets an envelope ramping from the first
+value to the second across the time selection.
+
+REAPER cannot automate "into" a preset directly. A preset is a snapshot of
+every parameter at once, so loading one is a jump and there is no preset
+position to sweep. This turns that jump into movement by diffing the two
+snapshots and writing one envelope per parameter that changed — which is the
+part that is impractical by hand, since a single preset change can move a
+dozen parameters or more.
+
+Stepped parameters — filter types, sync divisions, waveform selectors — are
+deliberately not ramped. Dragging a three-position switch through its
+intermediate values gives zipper noise or nothing at all, so they are switched
+cleanly at one end instead, and the script names the ones it treated that way.
+
+It can also fade the plugin's wet control up from silent at the same time, so
+the effect arrives as the morph happens. That uses wet rather than bypass on
+purpose: bypass is on or off, so automating it clicks.
+
+Reading preset names means loading each one briefly, because REAPER has no
+call for "name of preset at index". That is audible, so the script refuses to
+run during playback.
+
 ### Speak automation state
 
 One spoken sentence describing the automation you are sitting in: the track and

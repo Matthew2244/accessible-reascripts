@@ -9,6 +9,7 @@
         <source main="main" file="Project/a11y_Speak project summary.lua">https://github.com/Matthew2244/accessible-reascripts/raw/main/Project/a11y_Speak%20project%20summary.lua</source>
         <source main="main" file="Navigation/a11y_Go to marker or region by name.lua">https://github.com/Matthew2244/accessible-reascripts/raw/main/Navigation/a11y_Go%20to%20marker%20or%20region%20by%20name.lua</source>
         <source main="main" file="Envelopes/a11y_Automate plugin parameter by name.lua">https://github.com/Matthew2244/accessible-reascripts/raw/main/Envelopes/a11y_Automate%20plugin%20parameter%20by%20name.lua</source>
+        <source main="main" file="Envelopes/a11y_Morph between two presets.lua">https://github.com/Matthew2244/accessible-reascripts/raw/main/Envelopes/a11y_Morph%20between%20two%20presets.lua</source>
         <source main="main" file="Envelopes/a11y_Ramp envelope over time selection.lua">https://github.com/Matthew2244/accessible-reascripts/raw/main/Envelopes/a11y_Ramp%20envelope%20over%20time%20selection.lua</source>
         <source main="main" file="Envelopes/a11y_Speak automation state.lua">https://github.com/Matthew2244/accessible-reascripts/raw/main/Envelopes/a11y_Speak%20automation%20state.lua</source>
         <source file="Lib/a11y.lua">https://github.com/Matthew2244/accessible-reascripts/raw/main/Lib/a11y.lua</source>
@@ -25,6 +26,7 @@ Included:
 - Speak project summary (accessible)
 - Go to marker or region by name (accessible)
 - Automate plugin parameter by name (accessible)
+- Morph between two plugin presets over the time selection (accessible)
 - Ramp envelope over time selection (accessible)
 - Speak automation state (accessible)
 
