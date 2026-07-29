@@ -88,6 +88,17 @@ function a11y.list_phrase(items, conjunction)
   return table.concat(items, ', ', 1, n - 1) .. ' ' .. conjunction .. ' ' .. items[n]
 end
 
+--- Speech-friendly label for a track: "4, Lead Vox".
+--
+-- The number goes first because that is how Reaper and OSARA refer to a track
+-- everywhere else, so hearing it first lines up with everything around it. An
+-- unnamed track says so rather than leaving a gap, which otherwise sounds
+-- identical to speech that was cut off.
+function a11y.track_label(number, name)
+  if name == nil or name == '' then name = 'unnamed' end
+  return string.format('%d, %s', number, name)
+end
+
 --- Seconds to a spoken duration: "3 minutes 4 seconds".
 function a11y.duration_phrase(seconds)
   seconds = math.max(0, math.floor((seconds or 0) + 0.5))

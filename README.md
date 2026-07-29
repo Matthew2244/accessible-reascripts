@@ -67,6 +67,30 @@ same plugin is already there. One undo step for all tracks.
 Pairs well with OSARA's "View FX parameters for current track" in a custom
 action, if you want to start editing immediately after adding.
 
+### Speak FX chain
+
+One keystroke and you hear what is actually on the selected track: every
+plugin in order, with its position, and whether it is bypassed or offline.
+Order is spoken because it matters — a compressor before a reverb is a
+different sound from one after it.
+
+It also tells you when the whole chain is switched off at the track, which is
+worth hearing first: every plugin can report as enabled while the entire chain
+is bypassed, and the track then sounds dry for no reason you can find.
+
+Pairs with `Add FX by name` — add a plugin, then check where it landed.
+
+This script only reads. It changes nothing.
+
+### Go to track by name
+
+Jump to a track by typing part of its name, instead of arrowing through the
+track list. In a forty-track session that is two keystrokes instead of a lot
+of counting. You can also just type a track number.
+
+The chosen track becomes the only selected track, so whatever you do next
+lands on it — and only on it.
+
 ### Go to marker or region by name
 
 Jump straight to a marker or region by typing part of its name, rather than
