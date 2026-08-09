@@ -82,6 +82,31 @@ Pairs with `Add FX by name` — add a plugin, then check where it landed.
 
 This script only reads. It changes nothing.
 
+### Build vinyl or cassette chain
+
+Builds a lo-fi playback chain on every selected track, in one action and in
+the right order:
+
+- **Vinyl** — Elliptical, Acceleration2, GrooveWear, Vinyl Noise
+- **Cassette** — Dubly3, CHOWTapeModel, Vinyl Noise set for tape hiss
+- **Noise only** — Vinyl Noise on its own
+
+The three Airwindows steps all come out of Airwindows Consolidated, which is
+one plugin holding every Airwindows algorithm behind a selector. That makes a
+chain of them unreadable by ear — three slots all announcing the same name —
+so each instance is renamed to the algorithm it is meant to be running, and
+the script sweeps the selector to set it. If it cannot confirm the selection
+it says which slots you still have to set by hand, rather than leaving one
+quietly running the wrong algorithm.
+
+A plugin that is not installed is skipped and named in the summary instead of
+stopping the chain, so Vinyl still builds without Airwindows and Cassette
+still builds without ChowTape.
+
+Vinyl Noise is a JSFX crackle, pops, hiss, rumble and hum generator. It is not
+part of this repository — it lives in your own `Effects` folder — and the
+script only sets its controls when it finds it.
+
 ### Go to track by name
 
 Jump to a track by typing part of its name, instead of arrowing through the
