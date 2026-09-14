@@ -26,6 +26,23 @@ ReaPack and ReaKontrol in one go.
 
 ## The scripts
 
+### What would you like to do — the menu
+
+The front door to everything else. Bind this one script to one keystroke and
+forget every other shortcut: it asks what you would like to do, finds the
+script that does it, and runs it — and that script then asks its own
+questions, exactly as if you had run it directly.
+
+Type a few words of what you want ("fades", "reverb bus", "insert a sound")
+and the matches come back as a numbered list. Scripts are findable by
+anything their documentation says, not just their names, so "reverb" finds
+the send bus script. Leave the box blank to browse instead: first the
+categories, then the scripts in the one you pick, so nothing is ever more
+than two short lists away.
+
+The menu discovers scripts from the folders on disk, so anything added to
+the collection later shows up in it automatically.
+
 ### Insert track template by name
 
 Type part of a track template's name and insert it, instead of arrowing
@@ -293,6 +310,11 @@ the action list once:
 Shortcuts are personal, so this collection deliberately does not ship any.
 Worth knowing: OSARA's own key map already claims a lot of combinations, so
 check a shortcut is free before committing to it.
+
+If remembering shortcuts is not your idea of fun, load just
+`Menu/a11y_What would you like to do.lua`, give it one key, and reach
+everything else through it. The menu runs scripts straight off the disk, so
+the others work through it without being loaded into the action list at all.
 
 These scripts are also designed to be chained. `Speak project summary` after
 `File: Save new version of project` in a single custom action is a good
