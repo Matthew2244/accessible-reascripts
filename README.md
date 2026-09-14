@@ -153,6 +153,85 @@ dialog per track. Put `#` where the number should go:
 Numbering follows track order, not the order you selected them. One undo step
 for the whole rename.
 
+### Speak routing
+
+One keystroke and you hear where the selected track's audio actually goes:
+whether it feeds the master or a folder parent, every send with its
+destination, level and pre or post position, every receive with where it
+comes from, and whether hardware outputs are assigned.
+
+A track that sounds wrong is very often a track routed wrong — a send left
+muted, a master send switched off, a receive you forgot existed. A main send
+that is off is announced early and loudly, because that is the classic
+silent-track mystery.
+
+This script only reads. It changes nothing.
+
+### Create send bus from selected tracks
+
+Make a new bus and send every selected track to it, in one move: type a
+name, and the bus appears at the end of the project with a post-fader send
+from each selected track at 0 dB. The classic use is a shared reverb or a
+scene-wide effect — select the twelve layers of a scene, run this once, and
+put the reverb on the bus it made.
+
+The tracks' own routing to the master is untouched; this adds sends, it does
+not move anything. The new bus ends up as the only selected track, so the
+next thing you do — adding the reverb — lands on it. One undo step.
+
+### Speak selected items
+
+Hear what is actually selected: each item's name, the track it sits on,
+where it starts, how long it is, its fades, and anything on the active take
+that changes the sound — pitch shift, playback rate, an alternate take being
+active, a mute.
+
+Built for layered sound design, where six items stacked across six tracks
+are one sound and you want to audit the whole stack by ear without arrowing
+through it item by item.
+
+This script only reads. It changes nothing.
+
+### Set fades on selected items
+
+Set the fade in and fade out of every selected item to an exact length,
+typed in seconds, from one dialog. Dragging a fade handle by ear works;
+typing `0.02` is faster and lands the same on all forty layers of a scene.
+
+Leave a field blank to leave that fade alone, so you can set every fade out
+without touching the fade ins. A fade longer than an item is shortened to
+fit, and the summary says on how many items that happened. Fade shapes are
+not changed. One undo step.
+
+### Ramp last touched parameter
+
+Write a rise or fall on whatever FX parameter you touched last — a filter
+opening over eight seconds, a reverb swelling into a scene change, a send
+dying away — without placing a single envelope point by hand.
+
+Touch the parameter (OSARA's FX parameters dialog counts), select the time
+the ramp should cover, run the script, and type where the ramp starts and
+ends as percentages of the parameter's range. Blank start means "from
+wherever it is now". With no time selection, the ramp runs from the edit
+cursor for however many seconds you type. Shapes: linear, square, slow
+start and end, fast start, fast end, bezier.
+
+The ramp replaces any envelope points already inside that stretch of time,
+and the parameter holds its ending value afterwards. Everything outside the
+ramp is untouched. One undo step.
+
+### Insert sound by name
+
+Type part of a sound's name and insert it from your sample library onto the
+selected track at the edit cursor — without walking the Media Explorer's
+folder tree to get there. The first run asks where your sounds live; after
+that the folder is remembered, and the same dialog lets you change it any
+time. Every audio file under that folder, subfolders included, is
+searchable, and search is the collection's usual forgiving kind.
+
+The Media Explorer with OSARA is still the tool for browsing and
+auditioning when you do not know what you want. This is for when you do.
+
 ## Installing
 
 Two routes: ReaPack if you just want the scripts, a clone if you might change
