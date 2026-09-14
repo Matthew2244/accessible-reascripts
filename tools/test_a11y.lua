@@ -326,6 +326,24 @@ do
 end
 
 --------------------------------------------------------------------------
+-- Track labels
+--------------------------------------------------------------------------
+
+do
+  local l = a11y.track_label(4, 'Lead Vox')
+  check('track label puts the number first', l == '4, Lead Vox', l)
+end
+
+do
+  -- An unnamed track has to say so. A trailing comma and silence sounds
+  -- exactly like speech that got cut off.
+  local l = a11y.track_label(12, '')
+  check('empty track name says unnamed', l == '12, unnamed', l)
+  local n = a11y.track_label(12, nil)
+  check('nil track name says unnamed', n == '12, unnamed', n)
+end
+
+--------------------------------------------------------------------------
 -- Windows paths
 --------------------------------------------------------------------------
 -- a11y.sep() reads package.config on every call, so Windows behaviour can be
