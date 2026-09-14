@@ -2,12 +2,21 @@
 <index version="1" name="Accessible ReaScripts">
   <category name="Accessible ReaScripts">
     <reapack name="Accessible ReaScripts" type="script" desc="Accessible ReaScripts">
-      <version name="1.0.1" author="Accessible ReaScripts contributors">
+      <version name="1.1.0" author="Accessible ReaScripts contributors">
+        <source main="main" file="Envelopes/a11y_Ramp last touched parameter.lua">https://github.com/Matthew2244/accessible-reascripts/raw/main/Envelopes/a11y_Ramp%20last%20touched%20parameter.lua</source>
+        <source main="main" file="Items/a11y_Set fades on selected items.lua">https://github.com/Matthew2244/accessible-reascripts/raw/main/Items/a11y_Set%20fades%20on%20selected%20items.lua</source>
+        <source main="main" file="Items/a11y_Speak selected items.lua">https://github.com/Matthew2244/accessible-reascripts/raw/main/Items/a11y_Speak%20selected%20items.lua</source>
+        <source main="main" file="Media/a11y_Insert sound by name.lua">https://github.com/Matthew2244/accessible-reascripts/raw/main/Media/a11y_Insert%20sound%20by%20name.lua</source>
+        <source main="main" file="Navigation/a11y_Go to marker or region by name.lua">https://github.com/Matthew2244/accessible-reascripts/raw/main/Navigation/a11y_Go%20to%20marker%20or%20region%20by%20name.lua</source>
+        <source main="main" file="Navigation/a11y_Go to track by name.lua">https://github.com/Matthew2244/accessible-reascripts/raw/main/Navigation/a11y_Go%20to%20track%20by%20name.lua</source>
+        <source main="main" file="Project/a11y_Speak project summary.lua">https://github.com/Matthew2244/accessible-reascripts/raw/main/Project/a11y_Speak%20project%20summary.lua</source>
         <source main="main" file="Tracks/a11y_Add FX by name.lua">https://github.com/Matthew2244/accessible-reascripts/raw/main/Tracks/a11y_Add%20FX%20by%20name.lua</source>
+        <source main="main" file="Tracks/a11y_Build vinyl or cassette chain.lua">https://github.com/Matthew2244/accessible-reascripts/raw/main/Tracks/a11y_Build%20vinyl%20or%20cassette%20chain.lua</source>
+        <source main="main" file="Tracks/a11y_Create send bus from selected tracks.lua">https://github.com/Matthew2244/accessible-reascripts/raw/main/Tracks/a11y_Create%20send%20bus%20from%20selected%20tracks.lua</source>
         <source main="main" file="Tracks/a11y_Insert track template by name.lua">https://github.com/Matthew2244/accessible-reascripts/raw/main/Tracks/a11y_Insert%20track%20template%20by%20name.lua</source>
         <source main="main" file="Tracks/a11y_Rename selected tracks.lua">https://github.com/Matthew2244/accessible-reascripts/raw/main/Tracks/a11y_Rename%20selected%20tracks.lua</source>
-        <source main="main" file="Project/a11y_Speak project summary.lua">https://github.com/Matthew2244/accessible-reascripts/raw/main/Project/a11y_Speak%20project%20summary.lua</source>
-        <source main="main" file="Navigation/a11y_Go to marker or region by name.lua">https://github.com/Matthew2244/accessible-reascripts/raw/main/Navigation/a11y_Go%20to%20marker%20or%20region%20by%20name.lua</source>
+        <source main="main" file="Tracks/a11y_Speak FX chain.lua">https://github.com/Matthew2244/accessible-reascripts/raw/main/Tracks/a11y_Speak%20FX%20chain.lua</source>
+        <source main="main" file="Tracks/a11y_Speak routing.lua">https://github.com/Matthew2244/accessible-reascripts/raw/main/Tracks/a11y_Speak%20routing.lua</source>
         <source file="Lib/a11y.lua">https://github.com/Matthew2244/accessible-reascripts/raw/main/Lib/a11y.lua</source>
       </version>
       <metadata>
@@ -16,11 +25,20 @@
 Every script speaks its result through OSARA, and none of them draw their own windows, so everything stays readable by VoiceOver and NVDA.
 
 Included:
+- Ramp last touched parameter (accessible)
+- Set fades on selected items (accessible)
+- Speak selected items (accessible)
+- Insert sound by name (accessible)
+- Go to marker or region by name (accessible)
+- Go to track by name (accessible)
+- Speak project summary (accessible)
 - Add FX by name to selected tracks (accessible)
+- Build a vinyl or cassette FX chain on selected tracks (accessible)
+- Create send bus from selected tracks (accessible)
 - Insert track template by name (accessible)
 - Rename selected tracks with a numbered pattern (accessible)
-- Speak project summary (accessible)
-- Go to marker or region by name (accessible)
+- Speak the FX chain of the selected track (accessible)
+- Speak routing (accessible)
 
 Requires OSARA. SWS is recommended.</description>
       </metadata>

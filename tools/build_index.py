@@ -32,8 +32,23 @@ from xml.dom import minidom
 
 PACKAGE_NAME = "Accessible ReaScripts"
 CATEGORY = "Accessible ReaScripts"
-SCRIPT_DIRS = ("Tracks", "Project", "Navigation")
+# Folders that hold things other than scripts. Script folders themselves are
+# discovered, not listed: a hardcoded list silently drops any new category
+# folder from the index, and --check then reports "up to date" while ReaPack
+# users never receive the new scripts. That happened once; not again.
+NON_SCRIPT_DIRS = {"Lib", "tools"}
 LIB_FILES = ("Lib/a11y.lua",)
+
+
+def script_dirs(root: pathlib.Path) -> list[str]:
+    """Top-level folders that contain scripts, discovered from disk."""
+    out = []
+    for d in sorted(root.iterdir()):
+        if not d.is_dir() or d.name in NON_SCRIPT_DIRS or d.name.startswith("."):
+            continue
+        if any(d.glob("a11y_*.lua")):
+            out.append(d.name)
+    return out
 
 
 def read_header(path: pathlib.Path) -> dict[str, str]:
@@ -58,7 +73,7 @@ def read_header(path: pathlib.Path) -> dict[str, str]:
 def collect(root: pathlib.Path) -> list[tuple[str, dict[str, str]]]:
     """Every script, as (repo-relative posix path, header)."""
     out = []
-    for folder in SCRIPT_DIRS:
+    for folder in script_dirs(root):
         d = root / folder
         if not d.is_dir():
             continue

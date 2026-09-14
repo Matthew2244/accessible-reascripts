@@ -10,6 +10,34 @@ Code picks up on its own when you open the repo. It is the short version — the
 two rules, the commands that verify a change, and the handful of facts that
 cost an afternoon each to rediscover. This file remains the reference.
 
+## Sending a change
+
+You do not need permission to start, and you do not need to be invited. Open an
+issue first only if you want to know whether an idea is wanted before spending
+time on it — for a fix, just send it.
+
+If you have push access, branch from `main`. Otherwise fork, which is the
+normal route:
+
+```bash
+gh repo fork Matthew2244/accessible-reascripts --clone
+cd accessible-reascripts
+git checkout -b my-change
+
+# work, then run the checks:
+lua tools/test_a11y.lua && python3 tools/check_api.py && python3 tools/build_index.py --check
+
+git commit -am "Short summary of what changed"
+gh pr create --fill
+```
+
+CI runs on every pull request, forks included, so you get the compile check,
+the library tests and the index check without anyone having to run them for
+you. `check_api.py` is the one CI cannot do; run it locally.
+
+Small pull requests get read faster than large ones, and one script per pull
+request is easier to test by ear than three.
+
 ## The two rules
 
 Everything else is a preference. These two are not.

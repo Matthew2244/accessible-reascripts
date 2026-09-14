@@ -67,6 +67,55 @@ same plugin is already there. One undo step for all tracks.
 Pairs well with OSARA's "View FX parameters for current track" in a custom
 action, if you want to start editing immediately after adding.
 
+### Speak FX chain
+
+One keystroke and you hear what is actually on the selected track: every
+plugin in order, with its position, and whether it is bypassed or offline.
+Order is spoken because it matters — a compressor before a reverb is a
+different sound from one after it.
+
+It also tells you when the whole chain is switched off at the track, which is
+worth hearing first: every plugin can report as enabled while the entire chain
+is bypassed, and the track then sounds dry for no reason you can find.
+
+Pairs with `Add FX by name` — add a plugin, then check where it landed.
+
+This script only reads. It changes nothing.
+
+### Build vinyl or cassette chain
+
+Builds a lo-fi playback chain on every selected track, in one action and in
+the right order:
+
+- **Vinyl** — Elliptical, Acceleration2, GrooveWear, Vinyl Noise
+- **Cassette** — Dubly3, CHOWTapeModel, Vinyl Noise set for tape hiss
+- **Noise only** — Vinyl Noise on its own
+
+The three Airwindows steps all come out of Airwindows Consolidated, which is
+one plugin holding every Airwindows algorithm behind a selector. That makes a
+chain of them unreadable by ear — three slots all announcing the same name —
+so each instance is renamed to the algorithm it is meant to be running, and
+the script sweeps the selector to set it. If it cannot confirm the selection
+it says which slots you still have to set by hand, rather than leaving one
+quietly running the wrong algorithm.
+
+A plugin that is not installed is skipped and named in the summary instead of
+stopping the chain, so Vinyl still builds without Airwindows and Cassette
+still builds without ChowTape.
+
+Vinyl Noise is a JSFX crackle, pops, hiss, rumble and hum generator. It is not
+part of this repository — it lives in your own `Effects` folder — and the
+script only sets its controls when it finds it.
+
+### Go to track by name
+
+Jump to a track by typing part of its name, instead of arrowing through the
+track list. In a forty-track session that is two keystrokes instead of a lot
+of counting. You can also just type a track number.
+
+The chosen track becomes the only selected track, so whatever you do next
+lands on it — and only on it.
+
 ### Go to marker or region by name
 
 Jump straight to a marker or region by typing part of its name, rather than
@@ -104,23 +153,113 @@ dialog per track. Put `#` where the number should go:
 Numbering follows track order, not the order you selected them. One undo step
 for the whole rename.
 
+### Speak routing
+
+One keystroke and you hear where the selected track's audio actually goes:
+whether it feeds the master or a folder parent, every send with its
+destination, level and pre or post position, every receive with where it
+comes from, and whether hardware outputs are assigned.
+
+A track that sounds wrong is very often a track routed wrong — a send left
+muted, a master send switched off, a receive you forgot existed. A main send
+that is off is announced early and loudly, because that is the classic
+silent-track mystery.
+
+This script only reads. It changes nothing.
+
+### Create send bus from selected tracks
+
+Make a new bus and send every selected track to it, in one move: type a
+name, and the bus appears at the end of the project with a post-fader send
+from each selected track at 0 dB. The classic use is a shared reverb or a
+scene-wide effect — select the twelve layers of a scene, run this once, and
+put the reverb on the bus it made.
+
+The tracks' own routing to the master is untouched; this adds sends, it does
+not move anything. The new bus ends up as the only selected track, so the
+next thing you do — adding the reverb — lands on it. One undo step.
+
+### Speak selected items
+
+Hear what is actually selected: each item's name, the track it sits on,
+where it starts, how long it is, its fades, and anything on the active take
+that changes the sound — pitch shift, playback rate, an alternate take being
+active, a mute.
+
+Built for layered sound design, where six items stacked across six tracks
+are one sound and you want to audit the whole stack by ear without arrowing
+through it item by item.
+
+This script only reads. It changes nothing.
+
+### Set fades on selected items
+
+Set the fade in and fade out of every selected item to an exact length,
+typed in seconds, from one dialog. Dragging a fade handle by ear works;
+typing `0.02` is faster and lands the same on all forty layers of a scene.
+
+Leave a field blank to leave that fade alone, so you can set every fade out
+without touching the fade ins. A fade longer than an item is shortened to
+fit, and the summary says on how many items that happened. Fade shapes are
+not changed. One undo step.
+
+### Ramp last touched parameter
+
+Write a rise or fall on whatever FX parameter you touched last — a filter
+opening over eight seconds, a reverb swelling into a scene change, a send
+dying away — without placing a single envelope point by hand.
+
+Touch the parameter (OSARA's FX parameters dialog counts), select the time
+the ramp should cover, run the script, and type where the ramp starts and
+ends as percentages of the parameter's range. Blank start means "from
+wherever it is now". With no time selection, the ramp runs from the edit
+cursor for however many seconds you type. Shapes: linear, square, slow
+start and end, fast start, fast end, bezier.
+
+The ramp replaces any envelope points already inside that stretch of time,
+and the parameter holds its ending value afterwards. Everything outside the
+ramp is untouched. One undo step.
+
+### Insert sound by name
+
+Type part of a sound's name and insert it from your sample library onto the
+selected track at the edit cursor — without walking the Media Explorer's
+folder tree to get there. The first run asks where your sounds live; after
+that the folder is remembered, and the same dialog lets you change it any
+time. Every audio file under that folder, subfolders included, is
+searchable, and search is the collection's usual forgiving kind.
+
+The Media Explorer with OSARA is still the tool for browsing and
+auditioning when you do not know what you want. This is for when you do.
+
 ## Installing
 
-This repository is **private**, so install it by cloning. ReaPack cannot be
-used while it stays private: ReaPack fetches the index over a plain HTTPS
-request with no way to send a GitHub token, so a private repository just
-returns "not found" to it.
+Two routes: ReaPack if you just want the scripts, a clone if you might change
+them.
 
-An `index.xml` is generated and committed anyway, so if the repository is ever
-made public, ReaPack works immediately with no further setup.
+### With ReaPack
 
-### Clone and link
+In REAPER, go to Extensions, ReaPack, Import repositories, and paste:
 
-You need access to the repository — ask Matthew for an invite — and a GitHub
-account with `gh` or an SSH key set up.
+`https://github.com/Matthew2244/accessible-reascripts/raw/main/index.xml`
 
-Clone it, then point REAPER at it with a symbolic link, so edits are live
-without copying files around each time:
+Then Extensions, ReaPack, Browse packages, and install "Accessible ReaScripts".
+It arrives as a single package — every script plus the shared library — so
+there is nothing to keep in sync by hand, and updates come through ReaPack
+like any other repository.
+
+**While this repository is private, ReaPack cannot reach it.** ReaPack fetches
+the index with a plain HTTPS request and has no way to send a GitHub token, so
+a private repository simply answers "not found". The index is generated and
+committed regardless, so this route starts working the moment the repository
+goes public, with nothing to change and nothing to regenerate.
+
+### By cloning
+
+The better route if you might change anything, because your edits are live in
+REAPER with no reinstall step. This is how contributors work.
+
+Clone it, then point REAPER at it with a symbolic link:
 
 ```bash
 git clone https://github.com/Matthew2244/accessible-reascripts.git ~/accessible-reascripts
@@ -136,19 +275,6 @@ mklink /D "%APPDATA%\REAPER\Scripts\accessible-reascripts" "%USERPROFILE%\access
 
 Update later with `git pull` in that folder. Nothing needs reinstalling; the
 symbolic link means REAPER is already reading the new files.
-
-### If it is ever made public
-
-Regenerate the index and push it:
-
-```bash
-python3 tools/build_index.py --url https://github.com/Matthew2244/accessible-reascripts --branch main
-```
-
-Then anyone can add it in REAPER under Extensions, ReaPack, Import
-repositories, using:
-
-`https://github.com/Matthew2244/accessible-reascripts/raw/main/index.xml`
 
 Keep the `Lib` folder next to the script folders. Every script loads
 `Lib/a11y.lua` from one level up, and will say so out loud if it cannot find
