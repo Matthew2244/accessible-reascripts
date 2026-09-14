@@ -228,14 +228,20 @@ dying away — without placing a single envelope point by hand.
 
 Touch the parameter (OSARA's FX parameters dialog counts), select the time
 the ramp should cover, run the script, and type where the ramp starts and
-ends as percentages of the parameter's range. Blank start means "from
-wherever it is now". With no time selection, the ramp runs from the edit
-cursor for however many seconds you type. Shapes: linear, square, slow
-start and end, fast start, fast end, bezier.
+ends as percentages of the parameter's range. The start is prefilled with
+where the parameter is now. With no time selection, the ramp runs from the
+edit cursor for however many seconds you type. Curves are words, not
+numbers: `linear`, `slow`, `fast start`, `fast end`, `square`, `bezier`.
 
 The ramp replaces any envelope points already inside that stretch of time,
-and the parameter holds its ending value afterwards. Everything outside the
-ramp is untouched. One undo step.
+the value just before it is pinned so nothing earlier bends, and the
+parameter holds its ending value afterwards. When playback is stopped, the
+confirmation speaks the plugin's own units too — "230 Hz", not just "20
+percent" — and the envelope is left selected for OSARA's point navigation.
+
+This is the sibling of `Ramp envelope over time selection`: that one ramps
+whichever envelope is selected and covers track volume, pan, width and mute;
+this one is the shortcut for a parameter your hands are already on.
 
 ### Insert sound by name
 
