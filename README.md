@@ -7,9 +7,9 @@ draw their own windows — REAPER's `gfx` windows are invisible to VoiceOver and
 NVDA, so this collection only ever uses native dialogs that screen readers
 already read correctly.
 
-Built and tested on macOS with VoiceOver. Nothing in it is macOS-specific, so
-it should work on Windows with NVDA; if you try it there, please say how it
-went.
+Built and tested on macOS with VoiceOver, and used on Windows with NVDA.
+Nothing in it is macOS-specific: paths come from REAPER itself rather than
+being hardcoded, and the path handling is tested against both separators.
 
 ## Requirements
 
@@ -193,6 +193,11 @@ plus a compile check of every `.lua` file. It cannot run `check_api.py` —
 that one needs REAPER installed — so run it yourself before opening a pull
 request. Nothing automated tests behaviour inside REAPER; that still takes a
 scratch project.
+
+`check_api.py` currently needs macOS or Linux: it reads the API names out of
+the REAPER binary with symbol patterns from a clang build, and the MSVC-built
+`reaper.exe` mangles them differently. On Windows it says so and stops, rather
+than reporting every name as broken. See CONTRIBUTING.md.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) before adding a script.
 
