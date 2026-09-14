@@ -1,7 +1,7 @@
 --[[
   @description Ramp last touched parameter (accessible)
   @author Accessible ReaScripts contributors
-  @version 1.0.0
+  @version 1.2.0
   @provides [main] .
   @about
     Write a rise or fall on whatever FX parameter you touched last — a
@@ -11,13 +11,24 @@
 
     Touch the parameter (OSARA's FX parameters dialog counts), select the
     time the ramp should cover, run the script, and type where the ramp
-    starts and ends as percentages of the parameter's range. Blank start
-    means "from wherever it is now". With no time selection, the ramp runs
-    from the edit cursor for however many seconds you type.
+    starts and ends as percentages of the parameter's range. The start is
+    prefilled with where the parameter is now, so leaving it alone ramps
+    from the current value. With no time selection, the ramp runs from the
+    edit cursor for however many seconds you type. Curves are words, not
+    numbers: linear, slow, fast start, fast end, square, bezier.
 
     The ramp replaces any envelope points already inside that stretch of
-    time, and the parameter holds its ending value afterwards. Everything
-    outside the ramp is untouched. One undo step.
+    time, and the parameter holds its ending value afterwards. The value
+    just before the ramp is pinned first, so the new points never bend
+    what came earlier. When playback is stopped, the confirmation speaks
+    the plugin's own units too — "230 Hz", not just "20 percent".
+
+    The envelope is left selected, so OSARA's point navigation and "Ramp
+    envelope over time selection" act on it immediately. That script is
+    this one's sibling: it ramps whichever envelope is selected, pairs
+    with "Automate plugin parameter by name", and works on track volume,
+    pan, width and mute as well. This one is the shortcut for a parameter
+    your hands are already on. One undo step either way.
 ]]
 
 local script_dir = ({ reaper.get_action_context() })[2]:match('^(.*[\\/])')
@@ -33,10 +44,22 @@ end
 
 --------------------------------------------------------------------------
 
-local SHAPES = {
-  [0] = 'linear', [1] = 'square', [2] = 'slow start and end',
-  [3] = 'fast start', [4] = 'fast end', [5] = 'bezier',
-}
+-- How far before the ramp the previous value is pinned, so the new start
+-- point cannot bend the automation that came before it. Tony's trick, from
+-- "Ramp envelope over time selection".
+local ANCHOR_GAP = 0.001
+
+--- Ask the plugin how it displays a value, so speech can say "230 Hz"
+--- rather than only "20 percent". Sets the parameter briefly and restores
+--- it, so it is only safe while playback is stopped.
+local function plugin_units(track, fx, parm, raw)
+  local original = reaper.TrackFX_GetParam(track, fx, parm)
+  reaper.TrackFX_SetParam(track, fx, parm, raw)
+  local _, shown = reaper.TrackFX_GetFormattedParamValue(track, fx, parm, '')
+  reaper.TrackFX_SetParam(track, fx, parm, original)
+  if shown == nil or shown == '' then return nil end
+  return shown
+end
 
 --- The FX parameter the user touched last, as track, fx index, param index.
 -- Prefers the modern API (Reaper 7), which can tell a take FX from a track
@@ -116,9 +139,9 @@ local function main()
 
   local ok, answer = reaper.GetUserInputs(
     'Ramp ' .. parmname, 4,
-    'Start percent (blank = current),End percent 0 to 100,' ..
-    'Seconds (blank = time selection),Shape 0 linear to 5 bezier,extrawidth=60',
-    ',,,0')
+    'Start percent,End percent 0 to 100,' ..
+    'Seconds (blank = time selection),Curve (linear slow fast start...),extrawidth=80',
+    string.format('%.0f,,,linear', current_pct))
   if not ok then
     a11y.abort('Cancelled. Nothing changed.')
   end
@@ -145,12 +168,7 @@ local function main()
     ramp_end = ramp_start + secs
   end
 
-  local shape = math.floor(tonumber((f4 or ''):gsub('%s', '')) or 0)
-  if not SHAPES[shape] then
-    a11y.abort(string.format('%s is not a shape. Shapes are 0 linear, 1 square, ' ..
-               '2 slow start and end, 3 fast start, 4 fast end, 5 bezier. Nothing changed.',
-               f4))
-  end
+  local shape, shape_name = a11y.envelope_shape(f4)
 
   reaper.Undo_BeginBlock()
 
@@ -165,10 +183,21 @@ local function main()
   local function env_value(pct)
     return reaper.ScaleToEnvelopeMode(mode, minval + pct / 100 * (maxval - minval))
   end
+  local function raw_value(pct)
+    return minval + pct / 100 * (maxval - minval)
+  end
+
+  -- Pin the value just before the ramp, so the new start point cannot bend
+  -- the automation that came earlier.
+  local anchor_time = math.max(0, ramp_start - ANCHOR_GAP)
+  local _, at_anchor = reaper.Envelope_Evaluate(env, anchor_time, 44100, 0)
 
   -- The ramp owns its stretch of time: points already inside it would
   -- fight the new shape, so they go.
   reaper.DeleteEnvelopePointRange(env, ramp_start, ramp_end)
+  if anchor_time > 0 and anchor_time < ramp_start then
+    reaper.InsertEnvelopePoint(env, anchor_time, at_anchor, 0, 0, false, true)
+  end
   reaper.InsertEnvelopePoint(env, ramp_start, env_value(start_pct), shape, 0, false, true)
   -- The final point is linear so whatever follows the ramp is not bent
   -- by the ramp's own shape.
@@ -178,9 +207,41 @@ local function main()
   reaper.UpdateArrange()
   reaper.Undo_EndBlock(string.format('Ramp %s (%s)', parmname, fxname), -1)
 
+  -- Never claim a ramp that is not there.
+  if reaper.CountEnvelopePoints(env) < 2 then
+    a11y.abort(string.format('REAPER did not keep the points on %s, %s. ' ..
+                             'Nothing was ramped.', parmname, fxname))
+  end
+
+  -- Leave the envelope selected, so OSARA point navigation and the sibling
+  -- ramp script act on it next; and record which parameter it belongs to,
+  -- so that script can speak the plugin's own units later.
+  reaper.SetCursorContext(2, env)
+  if math.floor(reaper.GetMediaTrackInfo_Value(track, 'IP_TRACKNUMBER')) > 0 then
+    a11y.remember('fx_track', reaper.GetTrackGUID(track))
+    a11y.remember('fx_index', fx)
+    a11y.remember('fx_param', parm)
+  end
+
+  local start_label = string.format('%.0f percent', start_pct)
+  local end_label = string.format('%.0f percent', end_pct)
+
+  -- Speaking the plugin's own units means briefly setting the parameter and
+  -- reading back how the plugin formats it. During playback the envelope is
+  -- driving the parameter, so the answer would be wrong; percent is always
+  -- right, so the extra detail is simply skipped then.
+  if (reaper.GetPlayState() & 1) == 0 then
+    local shown_start = plugin_units(track, fx, parm, raw_value(start_pct))
+    local shown_end = plugin_units(track, fx, parm, raw_value(end_pct))
+    if shown_start and shown_end then
+      start_label = start_label .. ', ' .. shown_start
+      end_label = end_label .. ', ' .. shown_end
+    end
+  end
+
   a11y.speak(string.format(
-    'Wrote a %s ramp on %s, %s, %s: %.0f to %.0f percent over %s, ending at %s.',
-    SHAPES[shape], parmname, fxname, track_phrase, start_pct, end_pct,
+    'Wrote a %s ramp on %s, %s, %s: %s to %s over %s, ending at %s. Envelope selected.',
+    shape_name, parmname, fxname, track_phrase, start_label, end_label,
     string.format('%.3g seconds', ramp_end - ramp_start),
     reaper.format_timestr(ramp_end, '')))
 end

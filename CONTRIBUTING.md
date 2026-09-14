@@ -82,8 +82,13 @@ sends.
 ## Adding a script
 
 Scripts live in a folder named for their category: `Tracks`, `Project`,
-`Navigation`. Add a folder if none fits. File names start with `a11y_` and
-describe the action in plain words.
+`Navigation`, `Envelopes`, `Items`, `Media`. Add a folder if none fits —
+`tools/build_index.py` and the "What would you like to do" menu both discover
+category folders from disk, so a new folder needs no registration anywhere.
+(The list used to be hardcoded in `build_index.py`, which silently dropped
+new folders from the ReaPack index while `--check` reported everything up to
+date; two people hit that independently before it was fixed.) File names
+start with `a11y_` and describe the action in plain words.
 
 Start from this skeleton:
 

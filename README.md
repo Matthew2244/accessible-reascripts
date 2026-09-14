@@ -228,14 +228,20 @@ dying away — without placing a single envelope point by hand.
 
 Touch the parameter (OSARA's FX parameters dialog counts), select the time
 the ramp should cover, run the script, and type where the ramp starts and
-ends as percentages of the parameter's range. Blank start means "from
-wherever it is now". With no time selection, the ramp runs from the edit
-cursor for however many seconds you type. Shapes: linear, square, slow
-start and end, fast start, fast end, bezier.
+ends as percentages of the parameter's range. The start is prefilled with
+where the parameter is now. With no time selection, the ramp runs from the
+edit cursor for however many seconds you type. Curves are words, not
+numbers: `linear`, `slow`, `fast start`, `fast end`, `square`, `bezier`.
 
 The ramp replaces any envelope points already inside that stretch of time,
-and the parameter holds its ending value afterwards. Everything outside the
-ramp is untouched. One undo step.
+the value just before it is pinned so nothing earlier bends, and the
+parameter holds its ending value afterwards. When playback is stopped, the
+confirmation speaks the plugin's own units too — "230 Hz", not just "20
+percent" — and the envelope is left selected for OSARA's point navigation.
+
+This is the sibling of `Ramp envelope over time selection`: that one ramps
+whichever envelope is selected and covers track volume, pan, width and mute;
+this one is the shortcut for a parameter your hands are already on.
 
 ### Insert sound by name
 
@@ -248,6 +254,76 @@ searchable, and search is the collection's usual forgiving kind.
 
 The Media Explorer with OSARA is still the tool for browsing and
 auditioning when you do not know what you want. This is for when you do.
+
+### Automate plugin parameter by name
+
+Type part of a parameter's name and get an envelope for it, ready to edit.
+Searches every parameter of every plugin on the selected track, plus the
+track's own volume, pan, width and mute.
+
+Exposing a plugin parameter for automation normally means opening the FX
+parameters dialog, scrolling until you find the parameter, nudging it so it
+becomes the "last touched" one, closing the dialog, pressing the
+show-envelope-for-last-touched-parameter action, then cycling envelopes until
+you land on the right one. REAPER has `GetFXEnvelope`, which creates the
+envelope directly from an index, so none of that is necessary.
+
+The envelope is created if it does not exist, made visible, and selected, so
+OSARA's envelope point navigation acts on it straight away.
+
+### Ramp envelope over time selection
+
+Ramp the selected envelope from one value to another across the time
+selection: a fade, a filter sweep, a level move under a voiceover. Both values
+and the curve are asked for in one dialog, prefilled with what the envelope is
+doing now, so leaving a field alone changes nothing.
+
+Values are typed in the units you think in — decibels for volume, percent for
+pan, width and plugin parameters, 0 or 1 for mute. Curve shapes are words
+rather than numbers: `linear`, `slow`, `fast start`, `fast end`, `square`,
+`bezier`.
+
+It pins the value immediately before the time selection. Without that, REAPER
+interpolates the new ramp all the way back to the point it adds automatically
+at the start of the project, so the value drifts across everything before the
+span you chose. Pinning keeps each ramp local, which means you can run this
+over one span after another to build up a shape.
+
+### Morph between two presets
+
+Pick a plugin, pick a preset to start from and a preset to end on, and every
+parameter that differs between them gets an envelope ramping from the first
+value to the second across the time selection.
+
+REAPER cannot automate "into" a preset directly. A preset is a snapshot of
+every parameter at once, so loading one is a jump and there is no preset
+position to sweep. This turns that jump into movement by diffing the two
+snapshots and writing one envelope per parameter that changed — which is the
+part that is impractical by hand, since a single preset change can move a
+dozen parameters or more.
+
+Stepped parameters — filter types, sync divisions, waveform selectors — are
+deliberately not ramped. Dragging a three-position switch through its
+intermediate values gives zipper noise or nothing at all, so they are switched
+cleanly at one end instead, and the script names the ones it treated that way.
+
+It can also fade the plugin's wet control up from silent at the same time, so
+the effect arrives as the morph happens. That uses wet rather than bypass on
+purpose: bypass is on or off, so automating it clicks.
+
+Reading preset names means loading each one briefly, because REAPER has no
+call for "name of preset at index". That is audible, so the script refuses to
+run during playback.
+
+### Speak automation state
+
+One spoken sentence describing the automation you are sitting in: the track and
+envelope, the track's automation mode, whether the envelope is armed and
+visible, how many points it has, the value under the edit cursor, how far the
+nearest points are on either side, and whether there is a time selection ready
+to ramp across.
+
+This script only reads. It changes nothing.
 
 ## Installing
 

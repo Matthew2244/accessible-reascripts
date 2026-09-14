@@ -2,8 +2,12 @@
 <index version="1" name="Accessible ReaScripts">
   <category name="Accessible ReaScripts">
     <reapack name="Accessible ReaScripts" type="script" desc="Accessible ReaScripts">
-      <version name="1.1.0" author="Accessible ReaScripts contributors">
+      <version name="1.2.0" author="Accessible ReaScripts contributors">
+        <source main="main" file="Envelopes/a11y_Automate plugin parameter by name.lua">https://github.com/Matthew2244/accessible-reascripts/raw/main/Envelopes/a11y_Automate%20plugin%20parameter%20by%20name.lua</source>
+        <source main="main" file="Envelopes/a11y_Morph between two presets.lua">https://github.com/Matthew2244/accessible-reascripts/raw/main/Envelopes/a11y_Morph%20between%20two%20presets.lua</source>
+        <source main="main" file="Envelopes/a11y_Ramp envelope over time selection.lua">https://github.com/Matthew2244/accessible-reascripts/raw/main/Envelopes/a11y_Ramp%20envelope%20over%20time%20selection.lua</source>
         <source main="main" file="Envelopes/a11y_Ramp last touched parameter.lua">https://github.com/Matthew2244/accessible-reascripts/raw/main/Envelopes/a11y_Ramp%20last%20touched%20parameter.lua</source>
+        <source main="main" file="Envelopes/a11y_Speak automation state.lua">https://github.com/Matthew2244/accessible-reascripts/raw/main/Envelopes/a11y_Speak%20automation%20state.lua</source>
         <source main="main" file="Items/a11y_Set fades on selected items.lua">https://github.com/Matthew2244/accessible-reascripts/raw/main/Items/a11y_Set%20fades%20on%20selected%20items.lua</source>
         <source main="main" file="Items/a11y_Speak selected items.lua">https://github.com/Matthew2244/accessible-reascripts/raw/main/Items/a11y_Speak%20selected%20items.lua</source>
         <source main="main" file="Media/a11y_Insert sound by name.lua">https://github.com/Matthew2244/accessible-reascripts/raw/main/Media/a11y_Insert%20sound%20by%20name.lua</source>
@@ -26,7 +30,11 @@
 Every script speaks its result through OSARA, and none of them draw their own windows, so everything stays readable by VoiceOver and NVDA.
 
 Included:
+- Automate plugin parameter by name (accessible)
+- Morph between two plugin presets over the time selection (accessible)
+- Ramp envelope over time selection (accessible)
 - Ramp last touched parameter (accessible)
+- Speak automation state (accessible)
 - Set fades on selected items (accessible)
 - Speak selected items (accessible)
 - Insert sound by name (accessible)

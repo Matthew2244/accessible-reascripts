@@ -251,6 +251,84 @@ do
 end
 
 --------------------------------------------------------------------------
+-- Envelope values
+--------------------------------------------------------------------------
+-- These get their own tests because a wrong conversion is silent. The ramp
+-- lands, the script speaks a confident number, and the automation is simply
+-- in the wrong place.
+
+local function near(a, b, tolerance)
+  return math.abs(a - b) <= (tolerance or 0.0001)
+end
+
+check('unity gain is 0 dB', near(a11y.gain_to_db(1), 0))
+check('half gain is about -6 dB', near(a11y.gain_to_db(0.5), -6.0206, 0.001))
+check('double gain is about +6 dB', near(a11y.gain_to_db(2), 6.0206, 0.001))
+check('0 dB is unity gain', near(a11y.db_to_gain(0), 1))
+check('-6.0206 dB is half gain', near(a11y.db_to_gain(-6.0206), 0.5, 0.0001))
+
+do
+  -- Silence would otherwise run to negative infinity, which formats as
+  -- "-inf" and is read aloud as nonsense.
+  check('zero gain floors instead of returning -inf',
+        a11y.gain_to_db(0) == a11y.MIN_DB)
+  check('negative gain floors too', a11y.gain_to_db(-1) == a11y.MIN_DB)
+  check('the floor converts back to silence', a11y.db_to_gain(a11y.MIN_DB) == 0)
+end
+
+do
+  local worst = 0
+  for db = -60, 12 do
+    local back = a11y.gain_to_db(a11y.db_to_gain(db))
+    worst = math.max(worst, math.abs(back - db))
+  end
+  check('dB survives a round trip across the useful range', worst < 0.0001,
+        'worst drift ' .. worst)
+end
+
+--------------------------------------------------------------------------
+-- Envelope point shapes
+--------------------------------------------------------------------------
+
+do
+  local cases = {
+    { 'linear', 0 }, { '', 0 }, { 'lin', 0 }, { 'straight', 0 },
+    { 'square', 1 }, { 'hold', 1 }, { 'step', 1 },
+    { 'slow', 2 }, { 'smooth', 2 }, { 'ease', 2 },
+    { 'fast start', 3 }, { 'faststart', 3 }, { 'start', 3 },
+    { 'fast end', 4 }, { 'fastend', 4 }, { 'end', 4 },
+    { 'bezier', 5 }, { 'bez', 5 },
+  }
+  for _, case in ipairs(cases) do
+    local id = a11y.envelope_shape(case[1])
+    check(string.format('shape %q is %d', case[1], case[2]), id == case[2],
+          'got ' .. tostring(id))
+  end
+end
+
+do
+  -- The two that the bare 'start' and 'end' keywords could plausibly break.
+  -- 'fast end' is saved by exact matches running first; 'slow start and end'
+  -- is saved by SHAPES being walked in order, so reordering that table would
+  -- break this one and not the other.
+  check('fast end is not captured by the start keyword',
+        a11y.envelope_shape('fast end') == 4)
+  check('slow start and end is slow, not start or end',
+        a11y.envelope_shape('slow start and end') == 2)
+end
+
+do
+  local id, name = a11y.envelope_shape('total gibberish')
+  check('unrecognised text falls back to linear', id == 0 and name == 'linear',
+        tostring(id) .. ' ' .. tostring(name))
+end
+
+do
+  local _, name = a11y.envelope_shape('fastend')
+  check('the spoken name is prose, not the typed word', name == 'fast end', name)
+end
+
+--------------------------------------------------------------------------
 -- Text helpers
 --------------------------------------------------------------------------
 
@@ -379,8 +457,19 @@ end
 
 do
   -- Off Windows a backslash is a legal filename character, not a separator.
+  --
+  -- This needs the same package.config swap as the Windows cases above, and
+  -- for the same reason in reverse. Run bare, it asserts non-Windows
+  -- behaviour against whatever platform the developer happens to be on, so
+  -- it passes on macOS and fails on Windows -- on the machine of the very
+  -- contributor these path tests were written for.
+  local real_config = package.config
+  package.config = '/\n;\n?\n!\n-\n'
+
   local b = a11y.basename('/tmp/odd\\name.RPP')
   check('backslash stays part of the name off Windows', b == 'odd\\name.RPP', b)
+
+  package.config = real_config
 end
 
 --------------------------------------------------------------------------
