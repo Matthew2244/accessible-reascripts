@@ -6,7 +6,7 @@ can extend the project correctly from this file alone, without having seen the
 conversation that started it.
 
 There is also a [CLAUDE.md](CLAUDE.md) at the repository root, which Claude
-Code picks up on its own when you open the repo. It is the short version — the
+Code picks up on its own when you open the repo. It is the short version: the
 two rules, the commands that verify a change, and the handful of facts that
 cost an afternoon each to rediscover. This file remains the reference.
 
@@ -14,7 +14,7 @@ cost an afternoon each to rediscover. This file remains the reference.
 
 You do not need permission to start, and you do not need to be invited. Open an
 issue first only if you want to know whether an idea is wanted before spending
-time on it — for a fix, just send it.
+time on it. For a fix, just send it.
 
 If you have push access, branch from `main`. Otherwise fork, which is the
 normal route:
@@ -61,7 +61,7 @@ numbered list and asks for a number. This is deliberately not a popup menu.
 first. REAPER has a native `File: Save new version of project`, and SWS has
 `Xenakios/SWS: Rename selected tracks`. Where a native action already does the
 work but does not say what happened, the useful contribution is a small script
-that speaks the result, which the user can chain after it in a custom action —
+that speaks the result, which the user can chain after it in a custom action,
 not a reimplementation.
 
 **Say when something failed.** If an operation did not do what it claimed,
@@ -82,7 +82,7 @@ sends.
 ## Adding a script
 
 Scripts live in a folder named for their category: `Tracks`, `Project`,
-`Navigation`, `Envelopes`, `Items`, `Media`. Add a folder if none fits —
+`Navigation`, `Envelopes`, `Items`, `Media`. Add a folder if none fits;
 `tools/build_index.py` and the "What would you like to do" menu both discover
 category folders from disk, so a new folder needs no registration anywhere.
 (The list used to be hardcoded in `build_index.py`, which silently dropped
@@ -149,7 +149,7 @@ lua tools/test_a11y.lua && python3 tools/check_api.py && python3 tools/build_ind
 All three run in a terminal with REAPER closed.
 
 GitHub Actions runs the first and third on every pull request, along with a
-compile check of every `.lua` file — the test suite only loads
+compile check of every `.lua` file, since the test suite only loads
 `Lib/a11y.lua`, so without that a syntax error in a script would stay hidden
 until someone pressed the shortcut and heard nothing. `check_api.py` is not in
 CI, because it works by reading the REAPER and OSARA binaries and neither can
@@ -162,8 +162,8 @@ eighteen tracks of a big band before you notice. Add a case for any ranking
 behaviour you rely on.
 
 By default the ranking tests run against a small built-in sample of template
-names. To exercise them against your own collection instead — which is a much
-better test, because real names are messier — dump it into a fixture:
+names. To exercise them against your own collection instead, dump it into a fixture. That is a
+much better test, because real names are messier:
 
 On macOS:
 
@@ -189,7 +189,7 @@ clients' names, so it stays on your machine.
 the REAPER binary using symbol patterns taken from the macOS build, where clang
 uses Itanium C++ mangling. MSVC mangles differently, so the extraction comes up
 empty there. Rather than then declaring every name in the repo broken, it
-refuses to report at all and says so — but it does mean a Windows contributor
+refuses to report at all and says so, but it does mean a Windows contributor
 is running two of the three checks, and the missing one is the misspelling
 catch. Adding a Windows pattern to `names_from_reaper()` is an open job and a
 genuinely useful contribution. Extension names are unaffected either way:
@@ -203,7 +203,7 @@ to `nil` and then dies at runtime, in a dialog, halfway through an edit.
 
 Anything that touches a real project still needs testing by hand in REAPER,
 with a scratch project. Say in your pull request what you tested and on which
-REAPER version — the pull request template asks for exactly this, because it
+REAPER version. The pull request template asks for exactly this, because it
 is the one thing a reviewer cannot find out any other way.
 
 If you add a script, regenerate the ReaPack index in the same commit:
@@ -239,7 +239,7 @@ This one is plain string matching, so it works on every platform.
 
 That prints the argument types, the argument names and the help text for the
 function. It is how the track template script was written, and how the
-`osara_outputMessage` signature was confirmed — OSARA registers it for
+`osara_outputMessage` signature was confirmed: OSARA registers it for
 ReaScript but does not mention it in its readme.
 
 The same trick works on extensions; they register names as `API_<Name>` and
@@ -249,10 +249,10 @@ document them as `APIdef_<Name>`.
 
 Match the surrounding code. Two-space indent, `snake_case` for locals,
 single quotes for Lua strings. Comments explain why something is done, not
-what the line says — particularly where the obvious approach is wrong, since
+what the line says, particularly where the obvious approach is wrong, since
 that is what saves the next person an afternoon.
 
 Write for the ear. Spoken messages are prose, not log lines: "Inserted piano
 1. Track 4, UADx Ravel Grand Piano." Avoid abbreviations a screen reader will
-mangle, and avoid `track(s)`, which is read aloud as "track parenthesis s" —
+mangle, and avoid `track(s)`, which is read aloud as "track parenthesis s";
 `a11y.plural` exists for this.

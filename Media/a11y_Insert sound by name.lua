@@ -5,7 +5,7 @@
   @provides [main] .
   @about
     Type part of a sound's name and insert it from your sample library
-    onto the selected track at the edit cursor — without walking the Media
+    onto the selected track at the edit cursor, without walking the Media
     Explorer's folder tree to get there. If you know the sound you want is
     called something like "door slam heavy", this is the fastest route
     from wanting it to hearing it in context.

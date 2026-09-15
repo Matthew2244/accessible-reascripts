@@ -3,7 +3,7 @@
 Scripts that make REAPER faster to use with a screen reader.
 
 Every script here speaks its result out loud through OSARA, and none of them
-draw their own windows — REAPER's `gfx` windows are invisible to VoiceOver and
+draw their own windows. REAPER's `gfx` windows are invisible to VoiceOver and
 NVDA, so this collection only ever uses native dialogs that screen readers
 already read correctly.
 
@@ -14,11 +14,11 @@ being hardcoded, and the path handling is tested against both separators.
 ## Requirements
 
 - REAPER 6.44 or newer (developed against 7.78)
-- [OSARA](https://osara.reaperaccessibility.com/) — required, this is what
-  does the speaking
-- [SWS](https://www.sws-extension.org/) — not required, but recommended
-- [ReaPack](https://reapack.com/) — optional, only for installing via the
-  package manager
+- [OSARA](https://osara.reaperaccessibility.com/) is required. It does the
+  speaking.
+- [SWS](https://www.sws-extension.org/) is recommended, not required.
+- [ReaPack](https://reapack.com/) is optional, only for installing via the
+  package manager.
 
 The quickest way to get all of these at once is
 [RABBIT](https://github.com/Timtam/rabbit), which installs REAPER, OSARA, SWS,
@@ -26,19 +26,23 @@ ReaPack and ReaKontrol in one go.
 
 ## The scripts
 
-### What would you like to do — the menu
+### What would you like to do (the menu)
 
 The front door to everything else. Bind this one script to one keystroke and
 forget every other shortcut: it asks what you would like to do, finds the
-script that does it, and runs it — and that script then asks its own
-questions, exactly as if you had run it directly.
+script that does it, and runs it. That script then asks its own questions,
+exactly as if you had run it directly.
 
 Type a few words of what you want ("fades", "reverb bus", "insert a sound")
-and the matches come back as a numbered list. Scripts are findable by
-anything their documentation says, not just their names, so "reverb" finds
-the send bus script. Leave the box blank to browse instead: first the
-categories, then the scripts in the one you pick, so nothing is ever more
-than two short lists away.
+and the matches come back as a numbered list. A script can be found by
+anything its documentation says as well as its name, so "reverb" finds the
+send bus script. Clear the box to browse instead: first the categories, then
+the scripts in the one you pick, so nothing is ever more than two short lists
+away.
+
+It also remembers you. The box comes prefilled with your last search, so
+running the same tool again is two presses of Enter, and the last three
+scripts you ran sit at the top of browsing as a Recent group.
 
 The menu discovers scripts from the folders on disk, so anything added to
 the collection later shows up in it automatically.
@@ -51,10 +55,10 @@ difference between two keystrokes and two minutes.
 
 Search is forgiving. All of these find `keyscape rhodes suitcase`:
 
-- `keyscape rhodes suitcase` — the whole name
-- `rhodes suit` — several words, in any order
-- `suitcase` — a word from the middle
-- `krs` — the first letter of each word
+- `keyscape rhodes suitcase`, the whole name
+- `rhodes suit`, several words, in any order
+- `suitcase`, a word from the middle
+- `krs`, the first letter of each word
 
 An exact name always wins, so searching `piano 1` inserts `piano 1` and not
 `piano 1 gospel`.
@@ -88,14 +92,14 @@ action, if you want to start editing immediately after adding.
 
 One keystroke and you hear what is actually on the selected track: every
 plugin in order, with its position, and whether it is bypassed or offline.
-Order is spoken because it matters — a compressor before a reverb is a
+Order is spoken because it matters. A compressor before a reverb is a
 different sound from one after it.
 
 It also tells you when the whole chain is switched off at the track, which is
 worth hearing first: every plugin can report as enabled while the entire chain
 is bypassed, and the track then sounds dry for no reason you can find.
 
-Pairs with `Add FX by name` — add a plugin, then check where it landed.
+Pairs with `Add FX by name`: add a plugin, then check where it landed.
 
 This script only reads. It changes nothing.
 
@@ -104,24 +108,24 @@ This script only reads. It changes nothing.
 Builds a lo-fi playback chain on every selected track, in one action and in
 the right order:
 
-- **Vinyl** — Elliptical, Acceleration2, GrooveWear, Vinyl Noise
-- **Cassette** — Dubly3, CHOWTapeModel, Vinyl Noise set for tape hiss
-- **Noise only** — Vinyl Noise on its own
+- **Vinyl**: Elliptical, Acceleration2, GrooveWear, Vinyl Noise
+- **Cassette**: Dubly3, CHOWTapeModel, Vinyl Noise set for tape hiss
+- **Noise only**: Vinyl Noise on its own
 
 The three Airwindows steps all come out of Airwindows Consolidated, which is
-one plugin holding every Airwindows algorithm behind a selector. That makes a
-chain of them unreadable by ear — three slots all announcing the same name —
-so each instance is renamed to the algorithm it is meant to be running, and
-the script sweeps the selector to set it. If it cannot confirm the selection
-it says which slots you still have to set by hand, rather than leaving one
+one plugin holding every Airwindows algorithm behind a selector. A chain of
+them is unreadable by ear, three slots all announcing the same name, so each
+instance is renamed to the algorithm it is meant to be running, and the
+script sweeps the selector to set it. If it cannot confirm the selection it
+says which slots you still have to set by hand, rather than leaving one
 quietly running the wrong algorithm.
 
 A plugin that is not installed is skipped and named in the summary instead of
 stopping the chain, so Vinyl still builds without Airwindows and Cassette
 still builds without ChowTape.
 
-Vinyl Noise is a JSFX crackle, pops, hiss, rumble and hum generator. It is not
-part of this repository — it lives in your own `Effects` folder — and the
+Vinyl Noise is a JSFX crackle, pops, hiss, rumble and hum generator. It is
+not part of this repository, it lives in your own `Effects` folder, and the
 script only sets its controls when it finds it.
 
 ### Go to track by name
@@ -131,7 +135,7 @@ track list. In a forty-track session that is two keystrokes instead of a lot
 of counting. You can also just type a track number.
 
 The chosen track becomes the only selected track, so whatever you do next
-lands on it — and only on it.
+lands on it, and only on it.
 
 ### Go to marker or region by name
 
@@ -146,8 +150,8 @@ cursor.
 
 One keystroke, and you hear: project name and version, whether there are
 unsaved changes, tempo and time signature at the cursor, project length, track
-and item counts, how many markers and regions, and — the part that is genuinely
-hard to notice by ear — how many items point at media files that are missing
+and item counts, how many markers and regions, and the part that is genuinely
+hard to notice by ear: how many items point at media files that are missing
 from disk.
 
 This script only reads. It changes nothing.
@@ -162,9 +166,9 @@ Rename every selected track from one dialog, instead of confirming a separate
 dialog per track. Put `#` where the number should go:
 
 - `Vox #` produces Vox 1, Vox 2, Vox 3
-- `Tom ##` produces Tom 01, Tom 02 — `##` pads to two digits
-- `Kick` produces Kick 1, Kick 2 — `#` is added automatically when you are
-  renaming several tracks
+- `Tom ##` produces Tom 01, Tom 02, since `##` pads to two digits
+- `Kick` produces Kick 1, Kick 2, because `#` is added automatically when you
+  are renaming several tracks
 - `Kick` stays Kick when only one track is selected
 
 Numbering follows track order, not the order you selected them. One undo step
@@ -177,7 +181,7 @@ whether it feeds the master or a folder parent, every send with its
 destination, level and pre or post position, every receive with where it
 comes from, and whether hardware outputs are assigned.
 
-A track that sounds wrong is very often a track routed wrong — a send left
+A track that sounds wrong is very often a track routed wrong: a send left
 muted, a master send switched off, a receive you forgot existed. A main send
 that is off is announced early and loudly, because that is the classic
 silent-track mystery.
@@ -189,18 +193,18 @@ This script only reads. It changes nothing.
 Make a new bus and send every selected track to it, in one move: type a
 name, and the bus appears at the end of the project with a post-fader send
 from each selected track at 0 dB. The classic use is a shared reverb or a
-scene-wide effect — select the twelve layers of a scene, run this once, and
+scene-wide effect. Select the twelve layers of a scene, run this once, and
 put the reverb on the bus it made.
 
 The tracks' own routing to the master is untouched; this adds sends, it does
 not move anything. The new bus ends up as the only selected track, so the
-next thing you do — adding the reverb — lands on it. One undo step.
+next thing you do, adding the reverb, lands on it. One undo step.
 
 ### Speak selected items
 
 Hear what is actually selected: each item's name, the track it sits on,
 where it starts, how long it is, its fades, and anything on the active take
-that changes the sound — pitch shift, playback rate, an alternate take being
+that changes the sound: pitch shift, playback rate, an alternate take being
 active, a mute.
 
 Built for layered sound design, where six items stacked across six tracks
@@ -220,24 +224,48 @@ without touching the fade ins. A fade longer than an item is shortened to
 fit, and the summary says on how many items that happened. Fade shapes are
 not changed. One undo step.
 
+### Make variations of selected items
+
+Turn one sound into a family of near copies. Each selected item gets a row
+of duplicates laid out after it on the same track, every copy nudged in
+pitch and, if you want, in time. Play the row and pick the one that sits
+right, or keep several and layer them.
+
+This is the oldest trick in sound design. A door slam repeated verbatim
+sounds like a machine, and the same slam a quarter of a semitone off sounds
+like a second take. Doing it by hand means duplicate, nudge, open pitch,
+type a number, and again for every copy. This does the whole family in one
+pass.
+
+You choose how many copies, how far the pitch may wander in either
+direction, how much timing jitter to add, and the gap between copies. Pitch
+changes use REAPER's ordinary take pitch, so length is preserved and
+everything else about the item, fades and take FX included, comes along
+into each copy.
+
+The copies end up selected, so the next thing you do, like setting fades on
+the whole family, lands on them and not the original. The original is never
+changed. One undo step.
+
 ### Ramp last touched parameter
 
-Write a rise or fall on whatever FX parameter you touched last — a filter
-opening over eight seconds, a reverb swelling into a scene change, a send
-dying away — without placing a single envelope point by hand.
+Write a rise or fall on whatever FX parameter you touched last, without
+placing a single envelope point by hand. A filter opening over eight
+seconds, a reverb swelling into a scene change, a send dying away.
 
 Touch the parameter (OSARA's FX parameters dialog counts), select the time
 the ramp should cover, run the script, and type where the ramp starts and
 ends as percentages of the parameter's range. The start is prefilled with
 where the parameter is now. With no time selection, the ramp runs from the
-edit cursor for however many seconds you type. Curves are words, not
+edit cursor for however many seconds you type. Curves are words rather than
 numbers: `linear`, `slow`, `fast start`, `fast end`, `square`, `bezier`.
 
 The ramp replaces any envelope points already inside that stretch of time,
 the value just before it is pinned so nothing earlier bends, and the
 parameter holds its ending value afterwards. When playback is stopped, the
-confirmation speaks the plugin's own units too — "230 Hz", not just "20
-percent" — and the envelope is left selected for OSARA's point navigation.
+confirmation also speaks the plugin's own units, so you hear "230 Hz" as
+well as the percentage, and the envelope is left selected for OSARA's point
+navigation.
 
 This is the sibling of `Ramp envelope over time selection`: that one ramps
 whichever envelope is selected and covers track volume, pan, width and mute;
@@ -246,7 +274,7 @@ this one is the shortcut for a parameter your hands are already on.
 ### Insert sound by name
 
 Type part of a sound's name and insert it from your sample library onto the
-selected track at the edit cursor — without walking the Media Explorer's
+selected track at the edit cursor, without walking the Media Explorer's
 folder tree to get there. The first run asks where your sounds live; after
 that the folder is remembered, and the same dialog lets you change it any
 time. Every audio file under that folder, subfolders included, is
@@ -278,7 +306,7 @@ selection: a fade, a filter sweep, a level move under a voiceover. Both values
 and the curve are asked for in one dialog, prefilled with what the envelope is
 doing now, so leaving a field alone changes nothing.
 
-Values are typed in the units you think in — decibels for volume, percent for
+Values are typed in the units you think in: decibels for volume, percent for
 pan, width and plugin parameters, 0 or 1 for mute. Curve shapes are words
 rather than numbers: `linear`, `slow`, `fast start`, `fast end`, `square`,
 `bezier`.
@@ -298,14 +326,15 @@ value to the second across the time selection.
 REAPER cannot automate "into" a preset directly. A preset is a snapshot of
 every parameter at once, so loading one is a jump and there is no preset
 position to sweep. This turns that jump into movement by diffing the two
-snapshots and writing one envelope per parameter that changed — which is the
+snapshots and writing one envelope per parameter that changed, which is the
 part that is impractical by hand, since a single preset change can move a
 dozen parameters or more.
 
-Stepped parameters — filter types, sync divisions, waveform selectors — are
-deliberately not ramped. Dragging a three-position switch through its
-intermediate values gives zipper noise or nothing at all, so they are switched
-cleanly at one end instead, and the script names the ones it treated that way.
+Stepped parameters, such as filter types, sync divisions and waveform
+selectors, are deliberately not ramped. Dragging a three-position switch
+through its intermediate values gives zipper noise or nothing at all, so they
+are switched cleanly at one end instead, and the script names the ones it
+treated that way.
 
 It can also fade the plugin's wet control up from silent at the same time, so
 the effect arrives as the morph happens. That uses wet rather than bypass on
@@ -337,7 +366,7 @@ In REAPER, go to Extensions, ReaPack, Import repositories, and paste:
 `https://github.com/Matthew2244/accessible-reascripts/raw/main/index.xml`
 
 Then Extensions, ReaPack, Browse packages, and install "Accessible ReaScripts".
-It arrives as a single package — every script plus the shared library — so
+It arrives as a single package, every script plus the shared library, so
 there is nothing to keep in sync by hand, and updates come through ReaPack
 like any other repository.
 
@@ -375,7 +404,7 @@ it.
 
 ## Loading the scripts and assigning shortcuts
 
-REAPER does not pick up script files on its own — each one has to be added to
+REAPER does not pick up script files on its own. Each one has to be added to
 the action list once:
 
 1. Press the key for Actions, show action list.
@@ -394,7 +423,7 @@ the others work through it without being loaded into the action list at all.
 
 These scripts are also designed to be chained. `Speak project summary` after
 `File: Save new version of project` in a single custom action is a good
-example — REAPER does the work, the script tells you what happened.
+example: REAPER does the work, the script tells you what happened.
 
 ## Development
 
@@ -404,7 +433,7 @@ Three checks, all runnable from a terminal without opening REAPER:
 lua tools/test_a11y.lua && python3 tools/check_api.py && python3 tools/build_index.py --check
 ```
 
-`test_a11y.lua` covers the pure logic — search ranking, numbering patterns,
+`test_a11y.lua` covers the pure logic: search ranking, numbering patterns,
 spoken phrasing. `check_api.py` reads the REAPER and extension binaries and
 verifies that every `reaper.*` name used in the repo actually exists, which
 catches the misspellings that otherwise only surface as a runtime error
@@ -413,8 +442,8 @@ script, which is the easiest thing to forget when adding one and impossible to
 notice by ear.
 
 GitHub Actions runs the first and last of those on every push and pull request,
-plus a compile check of every `.lua` file. It cannot run `check_api.py` —
-that one needs REAPER installed — so run it yourself before opening a pull
+plus a compile check of every `.lua` file. It cannot run `check_api.py`, since
+that one needs REAPER installed, so run it yourself before opening a pull
 request. Nothing automated tests behaviour inside REAPER; that still takes a
 scratch project.
 

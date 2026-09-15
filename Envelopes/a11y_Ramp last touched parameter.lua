@@ -1,27 +1,28 @@
 --[[
   @description Ramp last touched parameter (accessible)
   @author Accessible ReaScripts contributors
-  @version 1.2.0
+  @version 1.2.1
   @provides [main] .
   @about
-    Write a rise or fall on whatever FX parameter you touched last — a
-    filter opening over eight seconds, a reverb swelling into a scene
-    change, a send dying away — without drawing a single envelope point
-    by hand.
+    Write a rise or fall on whatever FX parameter you touched last,
+    without drawing a single envelope point by hand. A filter opening
+    over eight seconds, a reverb swelling into a scene change, a send
+    dying away.
 
     Touch the parameter (OSARA's FX parameters dialog counts), select the
     time the ramp should cover, run the script, and type where the ramp
     starts and ends as percentages of the parameter's range. The start is
     prefilled with where the parameter is now, so leaving it alone ramps
     from the current value. With no time selection, the ramp runs from the
-    edit cursor for however many seconds you type. Curves are words, not
-    numbers: linear, slow, fast start, fast end, square, bezier.
+    edit cursor for however many seconds you type. Curves are words rather
+    than numbers: linear, slow, fast start, fast end, square, bezier.
 
     The ramp replaces any envelope points already inside that stretch of
     time, and the parameter holds its ending value afterwards. The value
     just before the ramp is pinned first, so the new points never bend
     what came earlier. When playback is stopped, the confirmation speaks
-    the plugin's own units too — "230 Hz", not just "20 percent".
+    the plugin's own units too, so you hear "230 Hz" as well as the
+    percentage.
 
     The envelope is left selected, so OSARA's point navigation and "Ramp
     envelope over time selection" act on it immediately. That script is

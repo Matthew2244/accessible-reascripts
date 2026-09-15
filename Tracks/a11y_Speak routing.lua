@@ -10,7 +10,7 @@
     where it comes from, and whether any hardware outputs are assigned.
 
     In a layered session, a track that sounds wrong is very often a track
-    routed wrong — a send left muted, a master send switched off, a receive
+    routed wrong: a send left muted, a master send switched off, a receive
     you forgot existed. This reads the whole picture in one pass.
 
     This script only reads. It changes nothing.

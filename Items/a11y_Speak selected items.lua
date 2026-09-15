@@ -6,7 +6,7 @@
   @about
     One keystroke and you hear what is actually selected: each item's name,
     the track it sits on, where it starts, how long it is, its fades, and
-    anything applied to the active take that changes the sound — pitch
+    anything applied to the active take that changes the sound: pitch
     shift, playback rate, reverse, mute, or a take other than the last one
     being active.
 

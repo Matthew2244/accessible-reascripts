@@ -1,18 +1,22 @@
 --[[
   @description What would you like to do (accessible menu)
   @author Accessible ReaScripts contributors
-  @version 1.0.0
+  @version 1.1.0
   @provides [main] .
   @about
     The front door to the whole collection. Bind this one script to one
     keystroke and forget every other shortcut: it asks what you would like
-    to do, finds the script that does it, and runs it — and that script
-    then asks its own questions, exactly as if you had run it directly.
+    to do, finds the script that does it, and runs it. That script then
+    asks its own questions, exactly as if you had run it directly.
 
     Type a few words of what you want ("fades", "reverb bus", "insert a
-    sound") and the matches are spoken as a numbered list. Leave the box
-    blank to browse instead: first the categories, then the scripts in the
-    one you pick, so nothing is ever more than two short lists away.
+    sound") and the matches are spoken as a numbered list. Clear the box
+    to browse instead: first the categories, then the scripts in the one
+    you pick, so nothing is ever more than two short lists away.
+
+    It also remembers you. The box comes prefilled with your last search,
+    so running the same tool again is two presses of Enter, and the last
+    three scripts you ran sit at the top of browsing as a Recent group.
 
     The menu discovers scripts from the folders on disk, so anything added
     to the collection later shows up here with no changes to this file.
@@ -77,6 +81,7 @@ local function collect()
             name = name,
             category = sub,
             path = path,
+            rel = sub .. '/' .. f,
             corpus = (name .. ' ' .. sub):lower() .. ' ' .. header_text(path),
           }
           scripts[#scripts + 1] = entry
@@ -101,15 +106,60 @@ local function collect()
   return scripts, categories, by_category
 end
 
---- Browse: pick a category, then a script inside it.
-local function browse(categories, by_category)
-  local cat = a11y.pick('Choose a category', categories, function(c)
-    return string.format('%s, %s', c, a11y.plural(#by_category[c], 'script'))
+--------------------------------------------------------------------------
+-- The menu remembers what you reach for. The last few scripts you ran sit
+-- at the top of browsing as a Recent group, and the search box comes
+-- prefilled with your last search, so "do that again" is two Enters.
+
+local RECENT_MAX = 3
+
+--- Relative paths of recently run scripts, most recent first.
+local function recent_paths()
+  local out = {}
+  for line in a11y.recall('menu_recent', ''):gmatch('[^\n]+') do
+    out[#out + 1] = line
+  end
+  return out
+end
+
+local function remember_recent(rel)
+  local kept = { rel }
+  for _, old in ipairs(recent_paths()) do
+    if old ~= rel and #kept < RECENT_MAX then kept[#kept + 1] = old end
+  end
+  a11y.remember('menu_recent', table.concat(kept, '\n'))
+end
+
+--- The recent scripts that still exist, as entries from `scripts`.
+local function recent_entries(scripts)
+  local by_rel = {}
+  for _, e in ipairs(scripts) do by_rel[e.rel] = e end
+  local out = {}
+  for _, rel in ipairs(recent_paths()) do
+    if by_rel[rel] then out[#out + 1] = by_rel[rel] end
+  end
+  return out
+end
+
+--- Browse: pick a category, then a script inside it. Scripts you ran
+--- recently appear as their own group at the top.
+local function browse(scripts, categories, by_category)
+  local recents = recent_entries(scripts)
+  local choices = {}
+  if #recents > 0 then
+    choices[#choices + 1] = 'Recent'
+  end
+  for _, c in ipairs(categories) do choices[#choices + 1] = c end
+
+  local cat = a11y.pick('Choose a category', choices, function(c)
+    local list = c == 'Recent' and recents or by_category[c]
+    return string.format('%s, %s', c, a11y.plural(#list, 'script'))
   end)
   if not cat then
     a11y.abort('Cancelled. Nothing was run.')
   end
-  local entry = a11y.pick(cat, by_category[cat], function(e) return e.name end)
+  local list = cat == 'Recent' and recents or by_category[cat]
+  local entry = a11y.pick(cat, list, function(e) return e.name end)
   if not entry then
     a11y.abort('Cancelled. Nothing was run.')
   end
@@ -124,9 +174,12 @@ local function main()
   end
 
   -- No comma in the caption: GetUserInputs treats commas as field
-  -- separators, and would silently cut the caption short.
+  -- separators, and would silently cut the caption short. The field comes
+  -- prefilled with your last search; press Enter to repeat it, type over
+  -- it to search for something else, or clear it to browse.
   local query = a11y.prompt('What would you like to do?',
-                            'A few words (blank to browse):', '', 80)
+                            'A few words (clear to browse):',
+                            a11y.recall('menu_query', ''), 80)
   if query == nil then
     a11y.abort('Cancelled. Nothing was run.')
   end
@@ -134,12 +187,12 @@ local function main()
 
   local entry
   if query == '' then
-    entry = browse(categories, by_category)
+    entry = browse(scripts, categories, by_category)
   else
     local matches = a11y.filter(query, scripts, function(e) return e.corpus end)
     if #matches == 0 then
       a11y.speak(string.format('Nothing here does "%s" yet. Browsing instead.', query))
-      entry = browse(categories, by_category)
+      entry = browse(scripts, categories, by_category)
     else
       entry = a11y.pick('What would you like to do?', matches,
                         function(e) return e.name end)
@@ -148,6 +201,11 @@ local function main()
       end
     end
   end
+
+  if query ~= '' then
+    a11y.remember('menu_query', query)
+  end
+  remember_recent(entry.rel)
 
   -- Hand over to the chosen script. It asks its own questions and speaks
   -- its own outcome; from here on it behaves exactly as if it had been

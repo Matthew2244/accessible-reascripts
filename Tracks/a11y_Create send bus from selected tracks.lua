@@ -7,12 +7,12 @@
     Make a new bus and send every selected track to it, in one move: type
     a name, and the bus appears at the end of the project with a post
     fader send from each selected track at 0 dB. The classic use is a
-    shared reverb or a scene-wide effect return — select the twelve layers
+    shared reverb or a scene-wide effect return: select the twelve layers
     of a scene, run this once, and put the reverb on the bus it made.
 
     The tracks' own routing to the master is left exactly as it was; this
     adds sends, it does not move anything. The new bus ends up as the only
-    selected track, so the next thing you do — adding the reverb — lands
+    selected track, so the next thing you do, adding the reverb, lands
     on it. One undo step.
 ]]
 
