@@ -69,6 +69,11 @@ RUNTIME_NAMES = {
     "defer",
     "atexit",
     "runloop",
+    # reaper.new_array is part of the Lua binding rather than the C API, so
+    # it is never registered as a name in the binary and would otherwise be
+    # reported as a misspelling. It is what every audio-reading call needs
+    # for its buffer, so anything that listens to the audio trips this.
+    "new_array",
 }
 
 

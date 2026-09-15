@@ -473,6 +473,85 @@ do
 end
 
 --------------------------------------------------------------------------
+-- Listening to the audio: spans, loud points and spoken times
+--------------------------------------------------------------------------
+-- These read a series of levels rather than real audio, which is the whole
+-- point of keeping them out of the Reaper calls. A level series is easy to
+-- write by hand and the edge cases are the ones that bite: a sound that
+-- runs to the very end, a gap too short to hear, a lone spike.
+
+do
+  -- 1 entry per 0.1s. Sound, then a real gap, then sound to the end.
+  local loud, quiet = 1.0, 0.0
+  local levels = {}
+  for i = 1, 10 do levels[i] = loud end        -- 0.0 to 1.0
+  for i = 11, 20 do levels[i] = quiet end      -- 1.0 to 2.0
+  for i = 21, 30 do levels[i] = loud end       -- 2.0 to 3.0
+
+  local spans = a11y.spans(levels, 10, { min_sound = 0.1, min_gap = 0.25 })
+  check('two stretches of sound with a gap between', #spans == 2, tostring(#spans))
+  check('first stretch starts at zero', spans[1] and spans[1].start == 0)
+  check('first stretch ends at one second', spans[1] and math.abs(spans[1].stop - 1.0) < 1e-9)
+  check('second stretch starts at two seconds', spans[2] and math.abs(spans[2].start - 2.0) < 1e-9)
+  check('a stretch that runs to the end is still closed',
+        spans[2] and math.abs(spans[2].stop - 3.0) < 1e-9)
+  check('peak is reported in decibels, not gain',
+        spans[1] and math.abs(spans[1].peak_db) < 0.001, spans[1] and tostring(spans[1].peak_db))
+end
+
+do
+  -- A gap of one entry, 0.1s, is shorter than anyone hears as a gap.
+  local levels = {}
+  for i = 1, 30 do levels[i] = 1.0 end
+  levels[15] = 0.0
+  local spans = a11y.spans(levels, 10, { min_gap = 0.25 })
+  check('a gap too short to hear does not split the sound in two', #spans == 1, tostring(#spans))
+end
+
+do
+  -- A single entry of sound is a click, not an event worth reporting.
+  local levels = {}
+  for i = 1, 30 do levels[i] = 0.0 end
+  levels[15] = 1.0
+  local spans = a11y.spans(levels, 10, { min_sound = 0.25 })
+  check('a sound shorter than the minimum is left out', #spans == 0, tostring(#spans))
+end
+
+do
+  local levels = {}
+  for i = 1, 30 do levels[i] = 0.0 end
+  check('silence has no stretches at all', #a11y.spans(levels, 10, {}) == 0)
+end
+
+do
+  -- Two excursions over the line, one of them several entries long.
+  local quiet = a11y.db_to_gain(-20)
+  local hot = a11y.db_to_gain(-0.5)
+  local levels = {}
+  for i = 1, 30 do levels[i] = quiet end
+  levels[5] = hot
+  levels[20], levels[21], levels[22] = hot, hot, hot
+
+  local hits = a11y.loud_points(levels, 10, -1)
+  check('a run of overs is one excursion, not one per entry', #hits == 2, tostring(#hits))
+  check('the excursion is timed from where it starts',
+        hits[1] and math.abs(hits[1].at - 0.4) < 1e-9, hits[1] and tostring(hits[1].at))
+  check('the length of an excursion is reported',
+        hits[2] and math.abs(hits[2].length - 0.3) < 1e-9, hits[2] and tostring(hits[2].length))
+  check('nothing is over the line when the line is above everything',
+        #a11y.loud_points(levels, 10, 6) == 0)
+end
+
+do
+  check('short times keep their milliseconds',
+        a11y.time_phrase(0.25) == '0.25 seconds', a11y.time_phrase(0.25))
+  check('a whole number of seconds does not trail zeros',
+        a11y.time_phrase(2) == '2 seconds', a11y.time_phrase(2))
+  check('past a minute it reads as minutes and seconds',
+        a11y.time_phrase(74) == '1 minute 14 seconds', a11y.time_phrase(74))
+end
+
+--------------------------------------------------------------------------
 
 print(string.format('%d passed, %d failed  (%d template names)', pass, fail, #names))
 for _, msg in ipairs(failures) do print('  FAIL: ' .. msg) end

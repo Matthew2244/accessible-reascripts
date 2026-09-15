@@ -528,4 +528,178 @@ function a11y.recall(key, default)
   return v
 end
 
+
+--------------------------------------------------------------------------
+-- Listening to the audio itself
+--------------------------------------------------------------------------
+-- Everything below exists because of one gap: a sighted person answers
+-- "what is actually there, and when" by looking at a waveform. These turn
+-- that question into something you can ask out loud.
+--
+-- The pure logic lives here, separate from the Reaper calls, so it can be
+-- tested in a terminal. Peak reading itself is in `read_levels`, which
+-- needs Reaper; `spans` and `loud_points` do not.
+
+--- Quietest level we bother calling sound. Anything under this reads as
+--- silence to a listener, and dither noise sits well below it.
+a11y.SILENCE_DB = -60
+
+--- Seconds as speech. Short times keep milliseconds, because a fade or a
+--- gap of a quarter second is a real thing you need the number for.
+--- Longer times read as minutes and seconds, because "203.417 seconds"
+--- tells you nothing you can act on.
+function a11y.time_phrase(seconds)
+  seconds = seconds or 0
+  if seconds < 60 then
+    local s = string.format('%.3f', seconds)
+    s = s:gsub('0+$', ''):gsub('%.$', '')
+    return s .. ' seconds'
+  end
+  return a11y.duration_phrase(seconds)
+end
+
+--- Find the stretches of a level series that are above `threshold_db`.
+--
+-- @param levels  array of magnitudes, 0 to 1, evenly spaced
+-- @param rate    how many entries per second
+-- @param opts    threshold_db  (default a11y.SILENCE_DB)
+--                min_sound     shortest run of sound worth reporting, seconds
+--                min_gap       shortest quiet worth breaking a span for
+-- @return array of { start = seconds, stop = seconds, peak_db = number }
+--
+-- The two minimums matter more than the threshold does. Without them a
+-- tremolo or a footstep pattern comes back as forty spans, which is a
+-- worse answer than one. Bridging short gaps first, then dropping short
+-- sounds, is the order that keeps a rhythmic passage as one event.
+function a11y.spans(levels, rate, opts)
+  opts = opts or {}
+  local threshold = opts.threshold_db or a11y.SILENCE_DB
+  local min_sound = opts.min_sound or 0.10
+  local min_gap = opts.min_gap or 0.25
+  local gate = a11y.db_to_gain(threshold)
+
+  local raw, open = {}, nil
+  for i = 1, #levels do
+    if levels[i] >= gate then
+      if not open then open = { first = i, last = i, peak = levels[i] } end
+      open.last = i
+      if levels[i] > open.peak then open.peak = levels[i] end
+    elseif open then
+      raw[#raw + 1] = open
+      open = nil
+    end
+  end
+  if open then raw[#raw + 1] = open end
+
+  -- Bridge gaps too short to hear as a gap.
+  local joined = {}
+  for _, span in ipairs(raw) do
+    local prev = joined[#joined]
+    if prev and (span.first - prev.last - 1) / rate < min_gap then
+      prev.last = span.last
+      if span.peak > prev.peak then prev.peak = span.peak end
+    else
+      joined[#joined + 1] = span
+    end
+  end
+
+  local out = {}
+  for _, span in ipairs(joined) do
+    local length = (span.last - span.first + 1) / rate
+    if length >= min_sound then
+      out[#out + 1] = {
+        start = (span.first - 1) / rate,
+        stop = span.last / rate,
+        peak_db = a11y.gain_to_db(span.peak),
+      }
+    end
+  end
+  return out
+end
+
+--- Find where a level series goes over `threshold_db`, one entry per
+--- excursion rather than one per sample over.
+--
+-- Reported as { at = seconds, peak_db = number, length = seconds }. A run
+-- of consecutive overs is a single excursion, because "clipping at 3.48,
+-- 3.49, 3.50" is the same fact said thirty times.
+function a11y.loud_points(levels, rate, threshold_db)
+  local gate = a11y.db_to_gain(threshold_db)
+  local out, open = {}, nil
+  for i = 1, #levels do
+    if levels[i] >= gate then
+      if not open then open = { first = i, peak = levels[i] } end
+      open.last = i
+      if levels[i] > open.peak then open.peak = levels[i] end
+    elseif open then
+      out[#out + 1] = { at = (open.first - 1) / rate,
+                        peak_db = a11y.gain_to_db(open.peak),
+                        length = (open.last - open.first + 1) / rate }
+      open = nil
+    end
+  end
+  if open then
+    out[#out + 1] = { at = (open.first - 1) / rate,
+                      peak_db = a11y.gain_to_db(open.peak),
+                      length = (open.last - open.first + 1) / rate }
+  end
+  return out
+end
+
+--- Read a take's audio as a series of peak magnitudes.
+--
+-- Returns levels, rate. Levels are 0 to 1, one entry per 1/rate second,
+-- taken as the larger of the positive and negative peak across every
+-- channel, so a mostly-negative transient still counts.
+--
+-- This reads the SOURCE audio of the take. Track FX, track volume and
+-- envelopes are not in it. Any script using this should say so rather
+-- than let someone believe they are hearing the mix.
+--
+-- Reaper hands peaks back interleaved: all the maximums for the block,
+-- then all the minimums. The return value packs the sample count into its
+-- low 20 bits, which is why it is masked rather than used directly.
+function a11y.read_levels(take, rate, start_time, length)
+  rate = rate or 40
+  local want = math.max(1, math.floor(length * rate + 0.5))
+  local channels = 2
+  local source = reaper.GetMediaItemTake_Source(take)
+  if source then
+    local n = reaper.GetMediaSourceNumChannels(source)
+    if n and n > 0 then channels = math.min(n, 4) end
+  end
+
+  local levels = {}
+  local CHUNK = 4096
+  local done = 0
+  while done < want do
+    local this = math.min(CHUNK, want - done)
+    local buf = reaper.new_array(this * channels * 3)
+    buf.clear()
+    local packed = reaper.GetMediaItemTake_Peaks(
+      take, rate, start_time + done / rate, channels, this, 0, buf)
+    local got = packed & 0xfffff
+    if got <= 0 then break end
+    local t = buf.table()
+    -- Layout: the maximums block first, then the minimums block. Inside
+    -- each block the channels are interleaved per sample, so sample i of
+    -- channel c is at (i - 1) * channels + c + 1.
+    local minimums = got * channels
+    for i = 1, got do
+      local level = 0
+      local base = (i - 1) * channels
+      for c = 1, channels do
+        local hi = math.abs(t[base + c] or 0)
+        local lo = math.abs(t[minimums + base + c] or 0)
+        if hi > level then level = hi end
+        if lo > level then level = lo end
+      end
+      levels[done + i] = level
+    end
+    done = done + got
+    if got < this then break end
+  end
+  return levels, rate
+end
+
 return a11y
