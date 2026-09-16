@@ -7,3 +7,9 @@
 # Generate yours with the command in CONTRIBUTING.md; the tests fall back to
 # a built-in sample when it is absent.
 tools/fixtures/
+
+# Byte-compiled helpers left behind by tools/check_api.py and
+# tools/build_index.py. Untracked files stop reascripts-sync from pulling,
+# so running the repo's own checks must not make the tree dirty.
+__pycache__/
+*.pyc
