@@ -247,6 +247,30 @@ The copies end up selected, so the next thing you do, like setting fades on
 the whole family, lands on them and not the original. The original is never
 changed. One undo step.
 
+### Line up WING-LIVE recordings
+
+When a console records to its own card while REAPER records over USB, you
+end up with two copies of the same performance that started a few seconds
+apart. This finds that gap by listening to a signal both recordings caught,
+such as the kick drum, and moves the console's files into place to the
+sample.
+
+Select the console items you want moved and one item REAPER recorded. The
+console items can be the multichannel chunk files straight off the card or
+the mono files split from them. The script asks which item is the REAPER
+one, which console item has the same signal and on which channel, and how
+many seconds either way to search (60 unless you change it). Every selected
+item except the REAPER one moves by the same amount, so chunks that sit end
+to end stay that way.
+
+It works for any two recordings that ran off the same clock. If they did
+not, the start will line up and the end will drift, and this is the wrong
+tool.
+
+If it can't find a clear match it says so and moves nothing. That includes
+music that repeats so exactly that two offsets fit equally well. A busier
+shared signal, like overheads or a vocal, usually solves it. One undo step.
+
 ### Ramp last touched parameter
 
 Write a rise or fall on whatever FX parameter you touched last, without
@@ -434,7 +458,7 @@ lua tools/test_a11y.lua && python3 tools/check_api.py && python3 tools/build_ind
 ```
 
 `test_a11y.lua` covers the pure logic: search ranking, numbering patterns,
-spoken phrasing. `check_api.py` reads the REAPER and extension binaries and
+spoken phrasing, and the offset search behind Line up WING-LIVE recordings. `check_api.py` reads the REAPER and extension binaries and
 verifies that every `reaper.*` name used in the repo actually exists, which
 catches the misspellings that otherwise only surface as a runtime error
 mid-edit. `build_index.py --check` confirms `index.xml` still lists every
@@ -451,6 +475,14 @@ scratch project.
 the REAPER binary with symbol patterns from a clang build, and the MSVC-built
 `reaper.exe` mangles them differently. On Windows it says so and stops, rather
 than reporting every name as broken. See CONTRIBUTING.md.
+
+`python3 tools/test_align_wavs.py` is an extra check for that offset search.
+It builds a small fake session of real WAV files in a temporary folder (a
+32-channel console recording split into two chunk files, and a REAPER-style
+reference) and confirms the offset comes back to the exact sample. It needs
+numpy, so it isn't in CI. `lua tools/align_wavs.lua` runs the same search on
+any WAV files you point it at, which is handy for checking real recordings
+outside REAPER.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) before adding a script.
 

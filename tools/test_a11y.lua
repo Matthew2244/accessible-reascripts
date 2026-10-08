@@ -552,6 +552,229 @@ do
 end
 
 --------------------------------------------------------------------------
+-- Lining up two recordings: FFT, correlation, and the whole search.
+--------------------------------------------------------------------------
+-- The search is tested end to end on synthetic audio at 8 kHz, where a
+-- "millisecond" envelope block is 8 samples. Everything is about exact
+-- sample offsets: lined up "nearly" is the bug this exists to prevent.
+
+do
+  -- FFT round trip, and a known transform: an impulse is flat.
+  local n = 64
+  local re, im, orig = {}, {}, {}
+  for i = 1, n do
+    orig[i] = math.sin(i * 0.7) + (i % 5) * 0.1
+    re[i], im[i] = orig[i], 0
+  end
+  a11y.fft(re, im, n)
+  a11y.fft(re, im, n, true)
+  local worst = 0
+  for i = 1, n do worst = math.max(worst, math.abs(re[i] - orig[i]), math.abs(im[i])) end
+  check('an FFT and its inverse give back the input', worst < 1e-12, tostring(worst))
+
+  local r2, i2 = {}, {}
+  for i = 1, 16 do r2[i], i2[i] = 0, 0 end
+  r2[1] = 1
+  a11y.fft(r2, i2, 16)
+  local flat = true
+  for i = 1, 16 do
+    if math.abs(r2[i] - 1) > 1e-12 or math.abs(i2[i]) > 1e-12 then flat = false end
+  end
+  check('the transform of an impulse is flat', flat)
+end
+
+do
+  -- FFT correlation against the obvious double loop.
+  local a, b = {}, {}
+  for i = 1, 37 do a[i] = math.cos(i * 1.3) * (i % 7) end
+  for i = 1, 100 do b[i] = math.sin(i * 0.37) + ((i * 13) % 11) * 0.05 end
+  local c = a11y.xcorr(a, 37, b, 100)
+  local worst = 0
+  for k = 0, 100 - 37 do
+    local s = 0
+    for j = 1, 37 do s = s + a[j] * b[j + k] end
+    worst = math.max(worst, math.abs(s - c[k + 1]))
+  end
+  check('FFT cross-correlation matches the direct sum', worst < 1e-9, tostring(worst))
+  check('one correlation value per possible lag', #c == 64, tostring(#c))
+
+  local r = a11y.ncc(a, 37, b, 100)
+  local inside = true
+  for k = 1, #r do if r[k] > 1 or r[k] < -1 then inside = false end end
+  check('normalised correlation stays between -1 and 1', inside)
+
+  -- b contains a copy of a, scaled and offset, at lag 20.
+  local b2 = {}
+  for i = 1, 100 do b2[i] = 0.01 * ((i * 7) % 5) end
+  for j = 1, 37 do b2[j + 20] = 3 * a[j] + 0.5 end
+  local r2 = a11y.ncc(a, 37, b2, 100)
+  check('a scaled copy correlates at exactly 1', math.abs(r2[21] - 1) < 1e-9, tostring(r2[21]))
+  check('a flat reference has no correlation at all',
+        a11y.ncc({ 2, 2, 2, 2 }, 4, b, 100) == nil)
+end
+
+do
+  local levels = { 0, 0, 0, 0, 1, 0, 1, 0, 0, 0 }
+  local at = a11y.busiest(levels, 10, 4)
+  check('the busiest stretch is the one with the most change', at == 4 or at == 5, tostring(at))
+  local hold = { 1, 1, 1, 1, 1, 1, 0, 1, 0, 1 }
+  check('a loud flat stretch is not busy', (a11y.busiest(hold, 10, 4)) >= 6)
+
+  local r = { 0, 0.5, 0.2, 0.9, 0.85, 0.1, 0.7, 0, 0.3, 0 }
+  local p = a11y.top_peaks(r, 10, 2, 3)
+  check('peaks come back best first', p[1] == 4 and p[2] == 7, table.concat(p, ' '))
+  check('a peak too close to a better one is skipped', p[3] == 2 or p[3] == 9, tostring(p[3]))
+
+  check('a near-perfect lone match is high confidence', a11y.match_confidence(0.99, 0.1) == 'high')
+  check('a weak match is low confidence', a11y.match_confidence(0.2, 0) == 'low')
+  check('two equal answers are low confidence', a11y.match_confidence(0.9, 0.85) == 'low')
+  check('a decent match with a rival is medium', a11y.match_confidence(0.8, 0.65) == 'medium')
+  check('an exact copy beside a similar drum hit is still high',
+        a11y.match_confidence(0.999, 0.72) == 'high')
+
+  check('offset later in seconds', a11y.offset_phrase(163776, 48000) == '3.412 seconds later',
+        a11y.offset_phrase(163776, 48000))
+  check('offset earlier in seconds', a11y.offset_phrase(-48000, 48000) == '1.000 seconds earlier',
+        a11y.offset_phrase(-48000, 48000))
+  check('tiny offsets are counted in samples', a11y.offset_phrase(1, 48000) == '1 sample later',
+        a11y.offset_phrase(1, 48000))
+  check('a few samples earlier', a11y.offset_phrase(-7, 48000) == '7 samples earlier',
+        a11y.offset_phrase(-7, 48000))
+end
+
+do
+  local saved = reaper.GetUserInputs
+  local seen_fields, seen_defaults
+  reaper.GetUserInputs = function(_, n, fields, defaults)
+    seen_fields, seen_defaults = fields, defaults
+    return true, '5,,60'
+  end
+  local got = a11y.prompt_many('t', { 'One', 'Two', 'Three' }, { 1, nil, 60 })
+  check('several fields go to one dialog', seen_fields == 'One,Two,Three', seen_fields)
+  check('defaults line up with their fields', seen_defaults == '1,,60', seen_defaults)
+  check('answers come back one per field, blanks kept',
+        got and #got == 3 and got[1] == '5' and got[2] == '' and got[3] == '60')
+  reaper.GetUserInputs = function() return false, '' end
+  check('cancel gives nil', a11y.prompt_many('t', { 'One' }) == nil)
+  reaper.GetUserInputs = saved
+end
+
+-- Synthetic "drums": decaying clicks at irregular times over quiet noise.
+local function performance(len, seed)
+  math.randomseed(seed)
+  local x = {}
+  for i = 1, len do x[i] = (math.random() - 0.5) * 0.02 end
+  local at = 1
+  while at < len do
+    local amp = 0.2 + math.random() * 0.7
+    local decay = 0.995 - math.random() * 0.02
+    local v = amp
+    for i = at, math.min(len, at + 1200) do
+      x[i] = x[i] + v * (math.random() - 0.5) * 2
+      v = v * decay
+    end
+    at = at + 400 + math.random(0, 3000)
+  end
+  return x
+end
+
+local function reader(x, shift, gain)
+  -- Reads x as if it started `shift` samples late; silence outside it.
+  gain = gain or 1
+  return function(start, count)
+    local out = {}
+    for i = 1, count do
+      local j = start + i - shift
+      out[i] = (x[j] or 0) * gain
+    end
+    return out
+  end
+end
+
+local RATE = 8000
+local SOURCE = performance(RATE * 14, 7)
+
+local function line_up(shift, extra)
+  local opts = {
+    ref = reader(SOURCE, 0),
+    sig = reader(SOURCE, shift),
+    rate = RATE, ref_len = RATE * 6, range = RATE * 2,
+  }
+  for k, v in pairs(extra or {}) do opts[k] = v end
+  return a11y.align(opts)
+end
+
+for _, case in ipairs({
+  { 12345, 'a late recording' },
+  { -9876, 'an early recording' },
+  { 4003, 'an offset that is not a whole millisecond' },
+  { 0, 'no offset at all' },
+  { 15990, 'an offset just inside the far edge of the search' },
+  { -15999, 'an offset just inside the near edge of the search' },
+}) do
+  local shift, name = case[1], case[2]
+  local res, why = line_up(shift)
+  check('finds ' .. name .. ' to the sample',
+        res and res.offset == shift,
+        res and string.format('got %d, wanted %d', res.offset, shift) or why)
+  check('and is sure about ' .. name, res and res.confidence == 'high',
+        res and string.format('%s, score %.3f, rival %.3f', res.confidence, res.score, res.second))
+end
+
+do
+  -- Quieter, inverted and carrying its own noise, like a second preamp tap.
+  local noisy = {}
+  for i = 1, #SOURCE do noisy[i] = SOURCE[i] + (math.random() - 0.5) * 0.004 end
+  local res = a11y.align({ ref = reader(SOURCE, 0), sig = reader(noisy, 777, -0.25),
+                           rate = RATE, ref_len = RATE * 6, range = RATE * 2 })
+  check('a quieter, upside-down copy still lines up to the sample',
+        res and res.offset == 777, res and tostring(res.offset))
+  check('and the flipped polarity is noticed', res and res.inverted == true)
+end
+
+do
+  -- Two unrelated performances must not "match".
+  local other = performance(RATE * 14, 99)
+  local res = a11y.align({ ref = reader(SOURCE, 0), sig = reader(other, 0),
+                           rate = RATE, ref_len = RATE * 6, range = RATE * 2 })
+  check('unrelated audio is low confidence', res and res.confidence == 'low',
+        res and string.format('%s, score %.3f', res.confidence, res.score))
+end
+
+do
+  -- A loop that repeats exactly has many right answers, so none of them is.
+  local bar = performance(RATE, 3)
+  local loop = {}
+  for i = 1, RATE * 14 do loop[i] = bar[(i - 1) % RATE + 1] end
+  local res = a11y.align({ ref = reader(loop, 0), sig = reader(loop, 2500),
+                           rate = RATE, ref_len = RATE * 6, range = RATE * 2 })
+  check('an exactly repeating loop is called ambiguous, not guessed',
+        res and res.confidence == 'low',
+        res and string.format('%s, score %.3f, rival %.3f', res.confidence, res.score, res.second))
+end
+
+do
+  local silent = {}
+  for i = 1, RATE * 14 do silent[i] = 0 end
+  local res, why = a11y.align({ ref = reader(silent, 0), sig = reader(SOURCE, 0),
+                                rate = RATE, ref_len = RATE * 6, range = RATE * 2 })
+  check('a silent reference is refused', res == nil and why == 'silent_ref', tostring(why))
+  res, why = a11y.align({ ref = reader(SOURCE, 0), sig = reader(silent, 0),
+                          rate = RATE, ref_len = RATE * 6, range = RATE * 2 })
+  check('a silent channel to match is refused', res == nil and why == 'silent_sig', tostring(why))
+  res, why = line_up(100, { sig_lo = RATE * 30, sig_hi = RATE * 40 })
+  check('no overlap within the search is refused', res == nil and why == 'no_overlap', tostring(why))
+end
+
+do
+  -- The other recording only starts 1 second before the reference stretch:
+  -- offsets earlier than that are impossible and must not be tried.
+  local res = line_up(3000, { sig_lo = -RATE, sig_hi = RATE * 20 })
+  check('a limited overlap still finds the offset', res and res.offset == 3000,
+        res and tostring(res.offset))
+end
+
+--------------------------------------------------------------------------
 
 print(string.format('%d passed, %d failed  (%d template names)', pass, fail, #names))
 for _, msg in ipairs(failures) do print('  FAIL: ' .. msg) end

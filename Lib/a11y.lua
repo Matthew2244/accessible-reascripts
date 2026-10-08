@@ -23,7 +23,7 @@
 
 local a11y = {}
 
-a11y.VERSION = '1.0.1'
+a11y.VERSION = '1.1.0'
 
 --------------------------------------------------------------------------
 -- Speech
@@ -700,6 +700,408 @@ function a11y.read_levels(take, rate, start_time, length)
     if got < this then break end
   end
   return levels, rate
+end
+
+--------------------------------------------------------------------------
+-- Several fields in one dialog
+--------------------------------------------------------------------------
+
+--- Ask several short questions in one native dialog, so a script that needs
+--- three numbers costs one Enter rather than three dialogs in a row.
+--
+-- Each caption is a field label; defaults line up with captions. Returns a
+-- table of strings (one per field), or nil if cancelled. Values must not
+-- contain commas: GetUserInputs separates fields with them.
+function a11y.prompt_many(title, captions, defaults, width)
+  local fields = table.concat(captions, ',')
+  if width then fields = fields .. ',extrawidth=' .. tostring(width) end
+  local values = {}
+  for i = 1, #captions do values[i] = tostring((defaults or {})[i] or '') end
+  local ok, answer = reaper.GetUserInputs(title, #captions, fields,
+                                          table.concat(values, ','))
+  if not ok then return nil end
+  local out = {}
+  for v in (answer .. ','):gmatch('([^,]*),') do out[#out + 1] = v end
+  for i = #out + 1, #captions do out[i] = '' end
+  return out
+end
+
+--------------------------------------------------------------------------
+-- Lining up two recordings of the same performance
+--------------------------------------------------------------------------
+-- A console that records to its own card while REAPER records over USB
+-- gives two copies of the same signals that started a few seconds apart.
+-- When both run off the same clock there is no drift, only one constant
+-- offset, and finding it is a cross-correlation problem.
+--
+-- Doing that directly at 48 kHz over a minute of search is far too slow in
+-- Lua, so it is done in two passes:
+--
+--   1. Coarse. Both signals become a level envelope at about 1 kHz (mean of
+--      the absolute value over each millisecond), and the envelopes are
+--      correlated over the whole search range with an FFT. That finds the
+--      offset to within a millisecond or so, and does not care about
+--      polarity or small differences in processing.
+--   2. Fine. Around each of the best few coarse candidates, a second or two
+--      of the real waveform is correlated at full rate over a small window,
+--      which pins the offset to the sample.
+--
+-- Fine-checking several coarse candidates, not just the best, is what makes
+-- the confidence honest: music that repeats bar after bar gives envelope
+-- peaks of nearly equal height, and the waveform tells them apart where the
+-- envelope cannot. When even the waveform cannot, the answer is "I am not
+-- sure", never a guess.
+--
+-- Everything here is pure: the audio comes in through reader functions, so
+-- the same code runs on REAPER's audio accessors and on test arrays.
+
+--- Smallest power of two that is at least n.
+function a11y.next_pow2(n)
+  local p = 1
+  while p < n do p = p * 2 end
+  return p
+end
+
+local twiddle_cache = {}
+
+--- In-place radix-2 FFT over 1-based arrays `re` and `im` of length `n`, a
+--- power of two. `inverse` runs the inverse transform, scaled by 1/n so a
+--- round trip returns the input.
+function a11y.fft(re, im, n, inverse)
+  n = math.tointeger(n) or n
+  -- Bit-reversal permutation, 0-based indices, +1 on access.
+  local j = 0
+  for i = 0, n - 2 do
+    if i < j then
+      re[i + 1], re[j + 1] = re[j + 1], re[i + 1]
+      im[i + 1], im[j + 1] = im[j + 1], im[i + 1]
+    end
+    local m = n // 2
+    while m >= 1 and j >= m do
+      j = j - m
+      m = m // 2
+    end
+    j = j + m
+  end
+
+  -- Twiddles computed once per size; a running product drifts at 2^18.
+  local tw = twiddle_cache[n]
+  if not tw then
+    tw = { c = {}, s = {} }
+    for k = 0, n // 2 - 1 do
+      local a = -2 * math.pi * k / n
+      tw.c[k + 1], tw.s[k + 1] = math.cos(a), math.sin(a)
+    end
+    twiddle_cache[n] = tw
+  end
+  local tc, ts = tw.c, tw.s
+  local sign = inverse and -1 or 1
+
+  local len = 2
+  while len <= n do
+    local half = len // 2
+    local stride = n // len
+    for k = 0, half - 1 do
+      local wr = tc[k * stride + 1]
+      local wi = sign * ts[k * stride + 1]
+      for start = 0, n - 1, len do
+        local a = start + k + 1
+        local b = a + half
+        local br, bi = re[b], im[b]
+        local xr = br * wr - bi * wi
+        local xi = br * wi + bi * wr
+        local ar, ai = re[a], im[a]
+        re[b] = ar - xr
+        im[b] = ai - xi
+        re[a] = ar + xr
+        im[a] = ai + xi
+      end
+    end
+    len = len * 2
+  end
+
+  if inverse then
+    for i = 1, n do
+      re[i] = re[i] / n
+      im[i] = im[i] / n
+    end
+  end
+end
+
+--- Raw cross-correlation of two real signals:
+---   c[k + 1] = sum over j = 1..na of a[j] * b[j + k],  k = 0 .. nb - na
+--- `a` is the shorter one. Both real signals ride in one complex FFT (a in
+--- the real part, b in the imaginary), which halves the work.
+function a11y.xcorr(a, na, b, nb)
+  local n = a11y.next_pow2(nb)
+  local re, im = {}, {}
+  for i = 1, n do
+    re[i] = i <= na and a[i] or 0.0
+    im[i] = i <= nb and b[i] or 0.0
+  end
+  a11y.fft(re, im, n)
+  -- Separate the two spectra: A = (Z[k] + conj Z[-k]) / 2,
+  -- B = (Z[k] - conj Z[-k]) / 2i, then form conj(A) * B.
+  local pr, pi = {}, {}
+  for k = 0, n - 1 do
+    local m = (n - k) % n
+    local zr, zi = re[k + 1], im[k + 1]
+    local mr, mi = re[m + 1], im[m + 1]
+    local ar, ai = (zr + mr) * 0.5, (zi - mi) * 0.5
+    local br, bi = (zi + mi) * 0.5, (mr - zr) * 0.5
+    pr[k + 1] = ar * br + ai * bi
+    pi[k + 1] = ar * bi - ai * br
+  end
+  a11y.fft(pr, pi, n, true)
+  local c = {}
+  for k = 1, nb - na + 1 do c[k] = pr[k] end
+  return c
+end
+
+--- Normalised (Pearson) cross-correlation: r[k + 1] is the correlation
+--- coefficient between a[1..na] and b[k+1 .. k+na], from -1 to 1. Gain does
+--- not matter, so a fader or trim difference between recordings is
+--- invisible to it. Returns nil when `a` is perfectly flat, because
+--- correlation with a constant means nothing.
+function a11y.ncc(a, na, b, nb)
+  local sum = 0
+  for i = 1, na do sum = sum + a[i] end
+  local mean = sum / na
+  local a0, ea = {}, 0
+  for i = 1, na do
+    local v = a[i] - mean
+    a0[i] = v
+    ea = ea + v * v
+  end
+  if ea <= 1e-24 * na then return nil end
+
+  local c = a11y.xcorr(a0, na, b, nb)
+  local s1, s2 = { [0] = 0 }, { [0] = 0 }
+  for i = 1, nb do
+    local v = b[i]
+    s1[i] = s1[i - 1] + v
+    s2[i] = s2[i - 1] + v * v
+  end
+  local r = {}
+  for k = 0, nb - na do
+    local S1 = s1[k + na] - s1[k]
+    local S2 = s2[k + na] - s2[k]
+    local var = S2 - S1 * S1 / na
+    local value = 0
+    if S2 > 0 and var > 1e-9 * S2 then
+      value = c[k + 1] / math.sqrt(ea * var)
+      if value > 1 then value = 1 elseif value < -1 then value = -1 end
+    end
+    r[k + 1] = value
+  end
+  return r
+end
+
+--- Level envelope: the mean absolute value of each full block of `hop`
+--- samples of x[1..count], appended to `out` (or a new table).
+function a11y.envelope(x, count, hop, out)
+  out = out or {}
+  local n = #out
+  for start = 0, count - hop, hop do
+    local s = 0
+    for i = start + 1, start + hop do
+      local v = x[i]
+      if v < 0 then v = -v end
+      s = s + v
+    end
+    n = n + 1
+    out[n] = s / hop
+  end
+  return out
+end
+
+--- Where is the busiest stretch of `width` entries in a level series?
+--- "Busiest" is the most change from one entry to the next, not simply the
+--- loudest: a held organ chord is loud but flat, and gives a correlation
+--- nothing to lock onto, while drums and speech are full of edges.
+--- Returns the 1-based start index and its score.
+function a11y.busiest(levels, count, width)
+  if width >= count then return 1, 0 end
+  local d = { 0 }
+  for i = 2, count do d[i] = math.abs(levels[i] - levels[i - 1]) end
+  local s = 0
+  for i = 2, width do s = s + d[i] end
+  local best, best_at = s, 1
+  for start = 2, count - width + 1 do
+    -- The window now runs start .. start + width - 1; its first difference
+    -- (into `start`) leaves, the last one joins.
+    s = s - d[start] + d[start + width - 1]
+    if s > best then best, best_at = s, start end
+  end
+  return best_at, best
+end
+
+--- The `count` highest local maxima of r, at least `min_sep` entries apart,
+--- best first. Returns a list of 1-based indices.
+function a11y.top_peaks(r, n, min_sep, count)
+  local cands = {}
+  for i = 1, n do
+    local v = r[i]
+    local left = i > 1 and r[i - 1] or -math.huge
+    local right = i < n and r[i + 1] or -math.huge
+    if v >= left and v > right then cands[#cands + 1] = i end
+  end
+  table.sort(cands, function(x, y) return r[x] > r[y] end)
+  local out = {}
+  for _, i in ipairs(cands) do
+    local ok = true
+    for _, j in ipairs(out) do
+      if math.abs(i - j) < min_sep then ok = false; break end
+    end
+    if ok then
+      out[#out + 1] = i
+      if #out >= count then break end
+    end
+  end
+  return out
+end
+
+--- How sure is a match? `best` is the strength of the winning waveform
+--- correlation (0 to 1) and `second` the strongest rival found at a
+--- different offset. Two recordings of the same digital signal score close
+--- to 1; unrelated audio scores close to 0; music that repeats exactly gives
+--- two near-equal answers, which is not a match, it is a coin toss.
+function a11y.match_confidence(best, second)
+  second = second or 0
+  if best < 0.35 then return 'low' end
+  if second >= 0.9 * best then return 'low' end
+  -- A near-perfect copy stays high even beside a strong rival: a kick drum
+  -- hit correlates around 0.7 with the next hit, but only the true offset
+  -- reaches 1.
+  if best >= 0.95 and second <= 0.85 * best then return 'high' end
+  if best >= 0.7 and second < 0.7 * best then return 'high' end
+  return 'medium'
+end
+
+--- A shift in samples as speech, three decimals of a second: "3.412 seconds
+--- later". Under half a millisecond the seconds would read as 0.000, so it
+--- counts samples instead.
+function a11y.offset_phrase(samples, rate)
+  local dir = samples > 0 and 'later' or 'earlier'
+  local n = math.abs(samples)
+  if n / rate < 0.0005 then
+    n = math.floor(n + 0.5)
+    return a11y.plural(n, 'sample') .. ' ' .. dir
+  end
+  return string.format('%.3f seconds %s', n / rate, dir)
+end
+
+--- Find the constant offset between two recordings of the same signal.
+--
+-- Sample positions are counted from a shared origin. The reference is read
+-- over [0, ref_len); the other recording is read wherever it is needed.
+-- If the same sound sits at reference sample n and at sample n + e in the
+-- other recording, the answer is e: positive means the other recording is
+-- late, and moving it e samples earlier lines the two up.
+--
+-- opts:
+--   ref(start, count)   returns `count` reference samples from `start`
+--   sig(start, count)   the same for the recording being lined up
+--   rate                sample rate
+--   ref_len             samples of reference to analyse
+--   range               search this many samples either way
+--   sig_lo, sig_hi      optional: where the other recording actually has
+--                       audio, so offsets that would run off it are skipped
+--   hop                 envelope block, default 1 ms
+--   fine_len            waveform stretch for the fine pass, default 2 s
+--   fine_radius         fine search either side of a candidate, default 20 ms
+--   candidates          coarse candidates checked at full rate, default 3
+--
+-- Returns a result table { offset, score, second, coarse, confidence,
+-- inverted, candidates }, or nil and a reason: 'short', 'silent_ref',
+-- 'flat_ref', 'silent_sig', 'no_overlap'.
+function a11y.align(opts)
+  local rate = opts.rate
+  local hop = opts.hop or math.max(1, math.floor(rate / 1000 + 0.5))
+  local bins_r = opts.ref_len // hop
+  local ref_len = bins_r * hop
+  local range = hop * math.ceil(opts.range / hop)
+  local radius = opts.fine_radius or math.max(2, math.floor(rate * 0.02 + 0.5))
+  local fine_len = math.min(opts.fine_len or math.floor(rate * 2 + 0.5), ref_len)
+  if bins_r < 16 or fine_len < 4 * hop then return nil, 'short' end
+  local gate = a11y.db_to_gain(a11y.SILENCE_DB)
+  local CHUNK = hop * 4096
+
+  -- Reference envelope.
+  local env_r = {}
+  for start = 0, ref_len - 1, CHUNK do
+    local n = math.min(CHUNK, ref_len - start)
+    a11y.envelope(opts.ref(start, n), n, hop, env_r)
+  end
+  local loudest = 0
+  for i = 1, bins_r do if env_r[i] > loudest then loudest = env_r[i] end end
+  if loudest < gate then return nil, 'silent_ref' end
+
+  -- Offsets worth trying: inside the range, and where the other recording
+  -- covers the whole reference stretch.
+  local lo, hi = -range, range
+  if opts.sig_lo then lo = math.max(lo, hop * math.ceil(opts.sig_lo / hop)) end
+  if opts.sig_hi then hi = math.min(hi, hop * ((opts.sig_hi - ref_len) // hop)) end
+  if lo > hi then return nil, 'no_overlap' end
+
+  local span = hi - lo + ref_len
+  local env_s = {}
+  for start = 0, span - 1, CHUNK do
+    local n = math.min(CHUNK, span - start)
+    a11y.envelope(opts.sig(lo + start, n), n, hop, env_s)
+  end
+  local bins_s = #env_s
+  local any = false
+  for i = 1, bins_s do if env_s[i] >= gate then any = true; break end end
+  if not any then return nil, 'silent_sig' end
+
+  local coarse = a11y.ncc(env_r, bins_r, env_s, bins_s)
+  if not coarse then return nil, 'flat_ref' end
+  local nlags = bins_s - bins_r + 1
+  local sep = math.max(2 * radius // hop + 2, math.floor(0.05 * rate / hop))
+  local peaks = a11y.top_peaks(coarse, nlags, sep, opts.candidates or 3)
+
+  -- Fine pass on the busiest part of the reference.
+  local fine_bins = math.ceil(fine_len / hop)
+  local fb = a11y.busiest(env_r, bins_r, fine_bins)
+  local f0 = math.min((fb - 1) * hop, ref_len - fine_len)
+  local ref_fine = opts.ref(f0, fine_len)
+
+  local results = {}
+  for _, p in ipairs(peaks) do
+    local guess = lo + (p - 1) * hop
+    local seg = opts.sig(f0 + guess - radius, fine_len + 2 * radius)
+    local r = a11y.ncc(ref_fine, fine_len, seg, fine_len + 2 * radius)
+    if r then
+      local bi, bv = 1, -1
+      for k = 1, #r do
+        local v = math.abs(r[k])
+        if v > bv then bi, bv = k, v end
+      end
+      results[#results + 1] = { offset = guess - radius + (bi - 1),
+                                score = bv, inverted = r[bi] < 0,
+                                coarse = coarse[p] }
+    end
+  end
+  if #results == 0 then return nil, 'flat_ref' end
+  table.sort(results, function(x, y) return x.score > y.score end)
+
+  local best = results[1]
+  local second = 0
+  for i = 2, #results do
+    if results[i].offset ~= best.offset and results[i].score > second then
+      second = results[i].score
+    end
+  end
+  return {
+    offset = best.offset,
+    score = best.score,
+    second = second,
+    coarse = best.coarse,
+    inverted = best.inverted,
+    confidence = a11y.match_confidence(best.score, second),
+    candidates = results,
+  }
 end
 
 return a11y

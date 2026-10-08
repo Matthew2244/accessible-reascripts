@@ -10,6 +10,7 @@
         <source main="main" file="Envelopes/a11y_Speak automation state.lua">https://github.com/Matthew2244/accessible-reascripts/raw/main/Envelopes/a11y_Speak%20automation%20state.lua</source>
         <source main="main" file="Items/a11y_Find edges that could click.lua">https://github.com/Matthew2244/accessible-reascripts/raw/main/Items/a11y_Find%20edges%20that%20could%20click.lua</source>
         <source main="main" file="Items/a11y_Find the loud bits.lua">https://github.com/Matthew2244/accessible-reascripts/raw/main/Items/a11y_Find%20the%20loud%20bits.lua</source>
+        <source main="main" file="Items/a11y_Line up WING-LIVE recordings.lua">https://github.com/Matthew2244/accessible-reascripts/raw/main/Items/a11y_Line%20up%20WING-LIVE%20recordings.lua</source>
         <source main="main" file="Items/a11y_Make variations of selected items.lua">https://github.com/Matthew2244/accessible-reascripts/raw/main/Items/a11y_Make%20variations%20of%20selected%20items.lua</source>
         <source main="main" file="Items/a11y_Ripple cut with crossfades.lua">https://github.com/Matthew2244/accessible-reascripts/raw/main/Items/a11y_Ripple%20cut%20with%20crossfades.lua</source>
         <source main="main" file="Items/a11y_Set fades on selected items.lua">https://github.com/Matthew2244/accessible-reascripts/raw/main/Items/a11y_Set%20fades%20on%20selected%20items.lua</source>
@@ -44,6 +45,7 @@ Included:
 - Speak automation state (accessible)
 - Find edges that could click (accessible)
 - Find the loud bits (accessible)
+- Line up WING-LIVE recordings (accessible)
 - Make variations of selected items (accessible)
 - Ripple cut with crossfades (accessible)
 - Set fades on selected items (accessible)
