@@ -1,7 +1,7 @@
 --[[
   @description Find edges that could click (accessible)
   @author Accessible ReaScripts contributors
-  @version 1.0.1
+  @version 1.0.2
   @provides [main] .
   @about
     Walks every item in the project and finds the item edges that are not
@@ -205,13 +205,14 @@ local function main()
     tail = string.format(' And %d quieter ones.', #open_edges - shown)
   end
 
-  a11y.speak(string.format('%s exposed in %s, loudest first. ',
-                           a11y.plural(#open_edges, 'open edge'),
-                           a11y.plural(items, 'item')) ..
-             table.concat(lines, '. ') .. '.' .. tail .. joins_note .. note)
-
+  -- The findings go in the question itself. Spoken just before it, they
+  -- were cut off by VoiceOver reading the message box as it opened.
+  local findings = string.format('%s exposed in %s, loudest first. ',
+                                 a11y.plural(#open_edges, 'open edge'),
+                                 a11y.plural(items, 'item')) ..
+                   table.concat(lines, '. ') .. '.' .. tail .. joins_note .. note
   if not a11y.confirm('Find edges that could click',
-                      string.format('Lengthen the fade on %s?',
+                      findings .. string.format('\n\nLengthen the fade on %s?',
                                     a11y.plural(#open_edges, 'open edge'))) then
     a11y.speak('Left them alone. Nothing changed.')
     return

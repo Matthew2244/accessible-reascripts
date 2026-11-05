@@ -23,7 +23,7 @@
 
 local a11y = {}
 
-a11y.VERSION = '1.2.0'
+a11y.VERSION = '1.3.0'
 
 --------------------------------------------------------------------------
 -- Speech
@@ -37,18 +37,55 @@ function a11y.has_osara()
   return reaper.osara_outputMessage ~= nil
 end
 
+-- When a dialog closes, focus goes back to REAPER's main window and the
+-- screen reader announces where it landed. Tested with VoiceOver: that
+-- announcement came about 0.9 seconds after Return, and cut off a result
+-- spoken straight away ("Track 21" was replaced by "New project button"
+-- 0.4 seconds in). So speech within this long of a dialog closing waits
+-- until the focus has settled, then speaks over the focus announcement.
+a11y.AFTER_DIALOG = 1.2
+
+local last_dialog = nil
+
+-- Every native dialog a script opens, through this library or directly,
+-- records when it closed. Each script runs in its own Lua state, so this
+-- touches only the script that loaded the library.
+for _, name in ipairs({ 'GetUserInputs', 'ShowMessageBox' }) do
+  local original = reaper[name]
+  if original then
+    reaper[name] = function(...)
+      local results = table.pack(original(...))
+      last_dialog = reaper.time_precise and reaper.time_precise() or nil
+      return table.unpack(results, 1, results.n)
+    end
+  end
+end
+
 --- Speak a message through the screen reader.
 -- Falls back to a message box when OSARA is unavailable, so a script never
--- fails silently on a machine without it.
+-- fails silently on a machine without it. Right after a dialog closes the
+-- message is held back briefly, see AFTER_DIALOG.
 -- @param msg string
 function a11y.speak(msg)
   msg = tostring(msg or '')
   if msg == '' then return end
-  if reaper.osara_outputMessage then
-    reaper.osara_outputMessage(msg)
-  else
+  if not reaper.osara_outputMessage then
     reaper.ShowMessageBox(msg, 'Accessible ReaScripts', 0)
+    return
   end
+  local due = last_dialog and (last_dialog + a11y.AFTER_DIALOG)
+  if due and reaper.defer and reaper.time_precise() < due then
+    local function later()
+      if reaper.time_precise() < due then
+        reaper.defer(later)
+      else
+        reaper.osara_outputMessage(msg)
+      end
+    end
+    reaper.defer(later)
+    return
+  end
+  reaper.osara_outputMessage(msg)
 end
 
 --- Speak a message and stop the script.
@@ -413,8 +450,8 @@ end
 --- Accessible chooser over a list.
 --
 -- Deliberately not a popup menu: Reaper's gfx menus are invisible to
--- VoiceOver. Instead we speak a numbered list and ask for a number, which
--- lands in the screen reader's announcement history so it can be reviewed.
+-- VoiceOver. Instead the numbered list is the label of a native text field,
+-- which the screen reader reads when the field takes focus.
 --
 -- The caller has usually already narrowed the list with a search, so this
 -- is normally a handful of items. `max_spoken` caps the read-out so a broad
@@ -424,8 +461,8 @@ end
 -- @param items table  list of items (must be non-empty)
 -- @param labelfn function|nil  item -> string
 -- @param max_spoken number|nil  default 12
--- @param intro string|nil  said first, in the same breath as the list, so
---   a separate message just before it is not cut off by the list
+-- @param intro string|nil  read first, as part of the same label, since a
+--   separate message just before the dialog would be cut off
 -- @return item|nil, index|nil
 function a11y.pick(title, items, labelfn, max_spoken, intro)
   labelfn = labelfn or tostring
@@ -436,28 +473,34 @@ function a11y.pick(title, items, labelfn, max_spoken, intro)
 
   -- A long list is read a page at a time. Every number in the whole list
   -- can be typed, and m reads the next page, so nothing is out of reach.
+  --
+  -- The list is the dialog's field label, not a separate message. Tested
+  -- with VoiceOver: a message spoken just before GetUserInputs opens is
+  -- cut off within a quarter of a second by the dialog's own announcement,
+  -- so the list was never heard. The label is read in full when the field
+  -- takes focus, and again whenever you return to it. Labels cannot hold
+  -- commas (GetUserInputs splits on them), so commas become semicolons.
   local first, default = 1, '1'
   while true do
     local last = math.min(n, first + max_spoken - 1)
     local lines = {}
     for i = first, last do
-      lines[#lines + 1] = string.format('%d, %s', i, labelfn(items[i]))
+      lines[#lines + 1] = string.format('%d: %s', i, (labelfn(items[i]):gsub(',', ';')))
     end
 
-    local header, footer = nil, ''
+    local header, ask
     if n > max_spoken then
-      header = string.format('%d matches. %d to %d: ', n, first, last)
-      footer = last < n and ' Type m for more.' or ' Type m to start again from 1.'
+      header = string.format('%d matches. %d to %d. ', n, first, last)
+      ask = last < n and string.format(' Type a number from 1 to %d or m for more:', n)
+                      or string.format(' Type a number from 1 to %d or m to start again:', n)
     else
-      header = string.format('%d matches: ', n)
+      header = string.format('%d matches. ', n)
+      ask = string.format(' Type a number from 1 to %d:', n)
     end
-    a11y.speak((intro and (intro .. ' ') or '') .. header ..
-               table.concat(lines, '. ') .. '.' .. footer)
+    local caption = (intro and (intro:gsub(',', ';') .. ' ') or '') .. header ..
+                    table.concat(lines, '. ') .. '.' .. ask
     intro = nil
 
-    -- No comma in the caption: GetUserInputs would split it into two.
-    local caption = n > max_spoken and string.format('Number 1 to %d or m for more:', n)
-                                    or string.format('Number 1 to %d:', n)
     local answer = a11y.prompt(title, caption, default, 60)
     if not answer then return nil end
     answer = answer:gsub('^%s+', ''):gsub('%s+$', '')
@@ -477,8 +520,11 @@ function a11y.pick(title, items, labelfn, max_spoken, intro)
 end
 
 --- Yes/no confirmation. Returns true only on Yes.
+-- Yes, No and Cancel rather than Yes and No: tested with VoiceOver on
+-- macOS, Escape does nothing in a Yes/No box, so the only way out was to
+-- find the No button. Cancel gives Escape somewhere to go, and counts as no.
 function a11y.confirm(title, question)
-  return reaper.ShowMessageBox(question, title, 4) == 6
+  return reaper.ShowMessageBox(question, title, 3) == 6
 end
 
 --------------------------------------------------------------------------

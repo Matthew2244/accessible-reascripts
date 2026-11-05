@@ -1,7 +1,7 @@
 --[[
   @description Ramp last touched parameter (accessible)
   @author Accessible ReaScripts contributors
-  @version 1.2.2
+  @version 1.2.3
   @provides [main] .
   @about
     Write a rise or fall on whatever FX parameter you touched last,
@@ -145,11 +145,11 @@ local function main()
   local sel_start, sel_end = reaper.GetSet_LoopTimeRange(false, false, 0, 0, false)
   local have_selection = sel_end > sel_start
 
-  a11y.speak(string.format('Ramping %s on %s, %s. Now at %.0f percent.',
-                           parmname, fxname, track_phrase, current_pct))
-
+  -- Which parameter this is goes in the dialog's title. Spoken as a
+  -- separate message, VoiceOver cut it off as the dialog opened.
   local ok, answer = reaper.GetUserInputs(
-    'Ramp ' .. parmname, 4,
+    string.format('Ramp %s on %s, %s. Now at %.0f percent',
+                  parmname, fxname, track_phrase, current_pct), 4,
     'Start percent,End percent 0 to 100,' ..
     'Seconds if no time selection,Curve (linear slow fast start...),extrawidth=80',
     string.format('%.0f,,,linear', current_pct))

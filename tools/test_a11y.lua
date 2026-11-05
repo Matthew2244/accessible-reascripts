@@ -565,15 +565,25 @@ do
   -- so the 25th of 40 console channels is reachable.
   local items = {}
   for i = 1, 40 do items[i] = 'channel ' .. i end
-  local answers, spoken = { 'm', 'm', '25' }, {}
+  local answers, captions = { 'm', 'm', '25' }, {}
   local saved_in, saved_box = reaper.GetUserInputs, reaper.ShowMessageBox
-  reaper.GetUserInputs = function() return true, table.remove(answers, 1) end
-  reaper.ShowMessageBox = function(msg) spoken[#spoken + 1] = msg; return 0 end
+  reaper.GetUserInputs = function(_, _, fields)
+    captions[#captions + 1] = fields
+    return true, table.remove(answers, 1)
+  end
+  reaper.ShowMessageBox = function() return 0 end
+  items[3] = 'channel 3, kick'
   local got, idx = a11y.pick('t', items)
   check('pick pages with m and takes any number in the list', got == 'channel 25' and idx == 25,
         tostring(got))
-  check('the second page starts at 13', spoken[2] and spoken[2]:find('13 to 24', 1, true) ~= nil,
-        tostring(spoken[2]))
+  -- The list is the field's label, because a message spoken just before
+  -- the dialog opens is cut off by it.
+  check('the list is in the dialog label', captions[1] and
+        captions[1]:find('1: channel 1. 2: channel 2.', 1, true) ~= nil, tostring(captions[1]))
+  check('a comma in a label cannot split the dialog field',
+        captions[1] and select(2, captions[1]:gsub(',', '')) == 1, tostring(captions[1]))
+  check('the second page starts at 13', captions[2] and captions[2]:find('13 to 24', 1, true) ~= nil,
+        tostring(captions[2]))
   answers = { '40' }
   got = a11y.pick('t', items)
   check('a number past the first page is accepted straight away', got == 'channel 40', tostring(got))

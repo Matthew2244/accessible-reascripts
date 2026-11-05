@@ -52,8 +52,15 @@ VoiceOver or NVDA. Neither are `gfx.showmenu` popups. Only use native dialogs:
 `reaper.GetUserInputs` and `reaper.ShowMessageBox`, both wrapped in
 `Lib/a11y.lua` as `a11y.prompt`, `a11y.pick` and `a11y.confirm`.
 
-If you need the user to choose from a list, use `a11y.pick`. It speaks a
-numbered list and asks for a number. This is deliberately not a popup menu.
+If you need the user to choose from a list, use `a11y.pick`. It puts a
+numbered list in the label of a native text field and asks for a number,
+twelve at a time, with m for more. This is deliberately not a popup menu.
+
+**Don't speak just before a dialog opens.** Tested with VoiceOver: the
+dialog's own announcement cuts off a message spoken a moment before, so
+anything the user needs to hear before answering belongs in the dialog's
+title, label or message. Speech straight after a dialog closes is held back
+by `a11y.speak` until the focus announcement is over, so results are heard.
 
 ## Some further guidance
 
