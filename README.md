@@ -495,8 +495,14 @@ It arrives as a single package, every script plus the shared library, so
 there is nothing to keep in sync by hand, and updates come through ReaPack
 like any other repository.
 
+**While this repository is private, ReaPack cannot reach it.** ReaPack fetches
+the index with a plain HTTPS request and has no way to send a GitHub token, so
+a private repository simply answers "not found". The index is generated and
+committed regardless, so this route starts working the moment the repository
+goes public, with nothing to change and nothing to regenerate.
+
 Each release raises the package version, which is how ReaPack knows there
-is something new. Releases are listed on the repository's Releases page.
+is something new.
 
 ### By cloning
 
