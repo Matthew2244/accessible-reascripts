@@ -46,6 +46,20 @@ project still needs testing on a scratch project. When you finish a script,
 say exactly what was tested and what remains to be tested by hand rather
 than reporting it as done.
 
+**Testing inside REAPER is possible, and was done for 1.3.0 to 1.3.2.** The
+pattern: run REAPER with its own throwaway config (`REAPER -cfgfile
+<scratch>/reaper.ini`, so the resource folder is the scratch folder and
+nobody's real settings or projects are touched), then drive it with
+`open -a REAPER test.lua`. A test script can replace `reaper.GetUserInputs`,
+`reaper.ShowMessageBox`, `reaper.osara_outputMessage` and
+`reaper.get_action_context` before `dofile`-ing a real script, which answers
+its dialogs and records what it says. Render with `RENDER_*` project settings
+and action 42230 to check audio. For a screen reader pass, link OSARA into the
+scratch config's `UserPlugins`, launch REAPER with `open -a` (VoiceOver did
+not follow a REAPER started straight from the binary), and poll
+`tell application "VoiceOver" to get content of last phrase` with timestamps:
+a phrase replaced within a fraction of a second was cut off.
+
 Facts measured in REAPER 7.82 that are easy to get wrong:
 
 - `GetMediaItemTake_Peaks` takes a **project** time, not a source time. An
@@ -58,6 +72,13 @@ Facts measured in REAPER 7.82 that are easy to get wrong:
   before sends; use `P_DESTTRACK` instead.
 - `D_FADEINLEN_AUTO` reads 0 on an ordinary item, meaning no automatic fade,
   and 0 is also how you clear one. Not -1.
+- A pan envelope stores left as positive: +1 renders on the left only, and
+  REAPER shows it as 100%L. That is the opposite of the track's `D_PAN`.
+- Under VoiceOver, a message spoken just before a dialog opens is cut off by
+  the dialog's announcement, and one spoken as a dialog closes is cut off by
+  the main window's. That is why `a11y.pick` puts its list in the field label
+  and `a11y.speak` waits after a dialog. Escape does nothing in a Yes/No
+  message box on macOS; `a11y.confirm` uses Yes/No/Cancel.
 
 If you add a script, regenerate the index in the same commit:
 

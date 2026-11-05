@@ -11,6 +11,23 @@ Built and tested on macOS with VoiceOver, and used on Windows with NVDA.
 Nothing in it is macOS-specific: paths come from REAPER itself rather than
 being hardcoded, and the path handling is tested against both separators.
 
+There are 28 scripts. The quickest way in is ReaPack: in REAPER, go to
+Extensions, ReaPack, Import repositories, and paste
+`https://github.com/Matthew2244/accessible-reascripts/raw/main/index.xml`.
+More under [Installing](#installing).
+
+## How the dialogs behave
+
+All the scripts work the same way by ear.
+
+- When you choose from a list, the list is the label of the number box, so
+  your screen reader reads it when the box opens. Lists come 12 at a time.
+  Type m for the next 12, or type any number in the list, even one you
+  haven't heard yet.
+- Escape cancels any dialog. In a yes or no question it counts as no.
+- A result spoken right after a dialog closes waits about a second, so the
+  screen reader's announcement of the main window doesn't cut it off.
+
 ## Requirements
 
 - REAPER 6.44 or newer (developed against 7.78)
@@ -65,8 +82,8 @@ Search is forgiving. All of these find `keyscape rhodes suitcase`:
 An exact name always wins, so searching `piano 1` inserts `piano 1` and not
 `piano 1 gospel`.
 
-When more than one template matches, the matches are spoken as a numbered
-list and you type the number you want. The newly inserted tracks are left
+When more than one template matches, you hear them as a numbered list and
+type the number you want. The newly inserted tracks are left
 selected, so whatever you do next lands on them. The whole insert is one undo
 step.
 
@@ -561,8 +578,9 @@ spoken phrasing, and the offset search behind Line up WING-LIVE recordings. `che
 verifies that every `reaper.*` name used in the repo actually exists, which
 catches the misspellings that otherwise only surface as a runtime error
 mid-edit. `build_index.py --check` confirms `index.xml` still lists every
-script, which is the easiest thing to forget when adding one and impossible to
-notice by ear.
+script and points each file at the tag for the version in `VERSION`, which is
+the easiest thing to forget when adding one and impossible to notice by ear.
+CONTRIBUTING.md has the steps for cutting a release.
 
 GitHub Actions runs the first and last of those on every push and pull request,
 plus a compile check of every `.lua` file. It cannot run `check_api.py`, since

@@ -215,8 +215,11 @@ It reads the names REAPER and the installed extensions register, so it catches
 misspellings, which are otherwise nasty: Lua evaluates `reaper.CountTraks(0)`
 to `nil` and then dies at runtime, in a dialog, halfway through an edit.
 
-Anything that touches a real project still needs testing by hand in REAPER,
-with a scratch project. Say in your pull request what you tested and on which
+Anything that touches a real project still needs testing in REAPER, with a
+scratch project. Running REAPER with its own throwaway config keeps that
+away from your real settings, and a test script can answer a script's
+dialogs and record what it says. CLAUDE.md describes how, including a
+VoiceOver pass. Say in your pull request what you tested and on which
 REAPER version. The pull request template asks for exactly this, because it
 is the one thing a reviewer cannot find out any other way.
 
