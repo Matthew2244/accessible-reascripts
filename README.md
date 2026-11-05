@@ -275,6 +275,29 @@ The copies end up selected, so the next thing you do, like setting fades on
 the whole family, lands on them and not the original. The original is never
 changed. One undo step.
 
+### Shift the pitch of one note
+
+Fix one sung or played note that's out of tune, smoothly, without touching
+the notes around it. Put the time selection over the note, on the selected
+item or the selected track, and run this. It asks how many semitones to move
+it and how long the glide into and out of the new pitch should be. Minus 1
+lowers it a half step. 0.5 raises it a quarter tone. The glide starts at 30
+milliseconds.
+
+The item is split so the note gets a short piece of its own, with about 60
+milliseconds to spare either side, and the pieces overlap by 20
+milliseconds with fades, so the joins are crossfades rather than cuts. Only that piece gets a take pitch envelope. It sits at 0 at both
+edges, glides to the new pitch by the time the note starts, holds it, and
+glides back to 0 just after the note ends. The crossfades sit where the
+pitch is untouched.
+
+If the take already has a pitch envelope, the shift is added on top, so you
+can run it again on the same note to move it further. An item that already
+plays at another rate, or already has its take pitch set, is going through
+the pitch shifter anyway, so it isn't split; the envelope goes on the whole
+item instead. MIDI items are refused. The note's piece ends up selected. One
+undo step.
+
 ### Ripple cut with crossfades
 
 Takes the time selection out of the selected tracks, or every track if none
