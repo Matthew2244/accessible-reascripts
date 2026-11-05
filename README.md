@@ -428,7 +428,7 @@ and the curve are asked for in one dialog, prefilled with what the envelope is
 doing now, so leaving a field alone changes nothing.
 
 Values are typed in the units you think in: decibels for volume and trim,
-percent for pan and width, percent of the parameter's own range for plugin
+percent for pan (minus 100 is hard left) and width, percent of the parameter's own range for plugin
 parameters, 0 or 1 for mute. Anything else, such as a take pitch envelope or
 the tempo map, uses its own numbers, so semitones or beats per minute. On a
 take envelope the time selection still means project time; the script
@@ -462,8 +462,9 @@ are switched cleanly at one end instead, and the script names the ones it
 treated that way.
 
 It can also fade the plugin's wet control up from silent at the same time, so
-the effect arrives as the morph happens. That uses wet rather than bypass on
-purpose: bypass is on or off, so automating it clicks.
+the effect arrives as the morph happens. Wet drops to silent over the 20
+milliseconds before the span rather than jumping. That uses wet rather than
+bypass on purpose: bypass is on or off, so automating it clicks.
 
 Reading preset names means loading each one briefly, because REAPER has no
 call for "name of preset at index". That is audible, so the script refuses to
@@ -495,14 +496,8 @@ It arrives as a single package, every script plus the shared library, so
 there is nothing to keep in sync by hand, and updates come through ReaPack
 like any other repository.
 
-**While this repository is private, ReaPack cannot reach it.** ReaPack fetches
-the index with a plain HTTPS request and has no way to send a GitHub token, so
-a private repository simply answers "not found". The index is generated and
-committed regardless, so this route starts working the moment the repository
-goes public, with nothing to change and nothing to regenerate.
-
 Each release raises the package version, which is how ReaPack knows there
-is something new.
+is something new. Releases are listed on the repository's Releases page.
 
 ### By cloning
 

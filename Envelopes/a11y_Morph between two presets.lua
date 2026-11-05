@@ -1,7 +1,7 @@
 --[[
   @description Morph between two plugin presets over the time selection (accessible)
   @author Accessible ReaScripts contributors
-  @version 1.0.1
+  @version 1.0.2
   @provides [main] .
   @about
     Pick a plugin, pick a preset to start from and a preset to end on, and
@@ -62,6 +62,9 @@ local SAME = 1e-5
 -- Keeps the ramp from interpolating back to the point REAPER adds at the
 -- start of the project. Same reason as the ramp script.
 local ANCHOR_GAP = 0.001
+
+-- How long the wet control takes to drop to silent just before the span.
+local WET_DIP = 0.020
 
 local function track_name(tr)
   local _, name = reaper.GetSetMediaTrackInfo_String(tr, 'P_NAME', '', false)
@@ -143,9 +146,10 @@ local function builtin_params(tr, fx)
   return skip
 end
 
---- Replace the span with a two point ramp, pinning what came before it.
-local function write_ramp(env, start_time, end_time, from_value, to_value, shape)
-  local anchor_time = math.max(0, start_time - ANCHOR_GAP)
+--- Replace the span with a two point ramp, pinning what came before it
+--- `gap` seconds early (default ANCHOR_GAP).
+local function write_ramp(env, start_time, end_time, from_value, to_value, shape, gap)
+  local anchor_time = math.max(0, start_time - (gap or ANCHOR_GAP))
   local _, before = reaper.Envelope_Evaluate(env, anchor_time, 44100, 0)
 
   reaper.DeleteEnvelopePointRange(env, start_time - 0.0000001, end_time + 0.0000001)
@@ -303,7 +307,13 @@ local function main()
     if wet_idx and wet_idx >= 0 then
       local env = reaper.GetFXEnvelope(tr, fx, wet_idx, true)
       if env then
-        write_ramp(env, start_time, end_time, 0, 1, 0)
+        -- Wet has to be silent at the start of the span, and is usually
+        -- full before it. Pinned a millisecond early, that drop is a jump
+        -- you can hear as a click. Without a pin it is worse: REAPER puts a
+        -- full-wet point at the project start, so wet fades out across
+        -- everything before the span. A 20 millisecond pin makes the drop
+        -- a short fade instead.
+        write_ramp(env, start_time, end_time, 0, 1, 0, WET_DIP)
         wet_done = true
       end
     end
@@ -335,7 +345,8 @@ local function main()
       a11y.list_phrase(switched))
   end
   if wet_done then
-    msg = msg .. '. Wet fades up from silent'
+    msg = msg .. '. Wet drops to silent over the 20 milliseconds before the span, ' ..
+               'then fades up across it'
   end
   if failed > 0 then
     msg = msg .. string.format('. %s could not be given an envelope',

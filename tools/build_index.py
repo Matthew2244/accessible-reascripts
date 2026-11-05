@@ -13,8 +13,16 @@ file conflict, and installing a single script would silently give you a
 half-working collection.
 
 Usage:
-    python3 tools/build_index.py --url https://github.com/OWNER/REPO --branch main
+    python3 tools/build_index.py --url https://github.com/OWNER/REPO
     python3 tools/build_index.py --check
+
+Each file's URL is pinned to the release tag, v<VERSION>, as ReaPack's own
+indexer pins to a commit: the files a version names never change after it
+ships. Pointing at a branch let one version name serve different files over
+time, and an installed copy never heard about the change. The index itself
+is still read from main, so the import URL stays .../raw/main/index.xml.
+Push the tag with the commit (git push origin main vX.Y.Z), or the file
+URLs answer 404 until it exists.
 
 Writes index.xml at the repo root. --check writes nothing and reports whether
 the committed index still matches the scripts on disk, which is the one thing
@@ -206,6 +214,7 @@ def check(root: pathlib.Path, url: str | None, branch: str | None,
         return 1
 
     found_url, found_branch = target_from_index(path)
+    explicit_branch = branch is not None
     url = url or found_url
     branch = branch or found_branch or "main"
     if not url:
@@ -214,6 +223,9 @@ def check(root: pathlib.Path, url: str | None, branch: str | None,
         return 1
 
     version = version or default_version(root)
+    # The files must point at this version's tag, whatever the old index
+    # used, so --check catches an index built against a branch.
+    branch = f"v{version}" if not explicit_branch else branch
     expected = build(root, url, branch, version)
 
     # Canonical XML with whitespace stripped, so pretty-printing that differs
@@ -240,7 +252,7 @@ def check(root: pathlib.Path, url: str | None, branch: str | None,
               f"the scripts say {version}", file=sys.stderr)
 
     print("\nRegenerate it and commit the result:\n"
-          f"  python3 tools/build_index.py --url {url} --branch {branch}",
+          f"  python3 tools/build_index.py --url {url}",
           file=sys.stderr)
     return 1
 
@@ -249,7 +261,8 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--url", default=None,
                     help="repository web URL, e.g. https://github.com/OWNER/REPO")
-    ap.add_argument("--branch", default=None, help="default: main")
+    ap.add_argument("--branch", default=None,
+                    help="ref the file URLs point at (default: the tag v<VERSION>)")
     ap.add_argument("--version", default=None,
                     help="package version (default: highest @version found)")
     ap.add_argument("--root", default=".")
@@ -268,13 +281,14 @@ def main() -> int:
 
     version = args.version or default_version(root)
 
-    branch = args.branch or "main"
+    branch = args.branch or f"v{version}"
     xml = build(root, args.url, branch, version)
     out = root / "index.xml"
     out.write_text(xml, encoding="utf-8")
     print(f"Wrote {out} (version {version}, {len(collect(root))} scripts).")
     print("Commit and push it, then the repository can be imported in ReaPack as:")
-    print(f"  {raw_url(args.url, branch, 'index.xml')}")
+    print(f"  {raw_url(args.url, 'main', 'index.xml')}")
+    print(f"File URLs point at the tag {branch}; push it with the commit.")
     return 0
 
 

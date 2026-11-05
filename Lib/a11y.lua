@@ -434,34 +434,46 @@ function a11y.pick(title, items, labelfn, max_spoken, intro)
   if n == 0 then return nil end
   if n == 1 then return items[1], 1 end
 
-  local shown = math.min(n, max_spoken)
-  local lines = {}
-  for i = 1, shown do
-    lines[#lines + 1] = string.format('%d, %s', i, labelfn(items[i]))
-  end
+  -- A long list is read a page at a time. Every number in the whole list
+  -- can be typed, and m reads the next page, so nothing is out of reach.
+  local first, default = 1, '1'
+  while true do
+    local last = math.min(n, first + max_spoken - 1)
+    local lines = {}
+    for i = first, last do
+      lines[#lines + 1] = string.format('%d, %s', i, labelfn(items[i]))
+    end
 
-  local header, footer = nil, ''
-  if n > shown then
-    header = string.format('%d matches. First %d: ', n, shown)
-    -- Only the spoken ones can be chosen, so say how to reach the rest
-    -- rather than leave them out of reach without a word.
-    footer = ' To reach the others, cancel and search with more of the name.'
-  else
-    header = string.format('%d matches: ', n)
-  end
-  a11y.speak((intro and (intro .. ' ') or '') .. header ..
-             table.concat(lines, '. ') .. '.' .. footer)
+    local header, footer = nil, ''
+    if n > max_spoken then
+      header = string.format('%d matches. %d to %d: ', n, first, last)
+      footer = last < n and ' Type m for more.' or ' Type m to start again from 1.'
+    else
+      header = string.format('%d matches: ', n)
+    end
+    a11y.speak((intro and (intro .. ' ') or '') .. header ..
+               table.concat(lines, '. ') .. '.' .. footer)
+    intro = nil
 
-  local caption = string.format('Number 1 to %d:', shown)
-  local answer = a11y.prompt(title, caption, '1', 60)
-  if not answer then return nil end
+    -- No comma in the caption: GetUserInputs would split it into two.
+    local caption = n > max_spoken and string.format('Number 1 to %d or m for more:', n)
+                                    or string.format('Number 1 to %d:', n)
+    local answer = a11y.prompt(title, caption, default, 60)
+    if not answer then return nil end
+    answer = answer:gsub('^%s+', ''):gsub('%s+$', '')
 
-  local idx = tonumber(answer)
-  if not idx or idx < 1 or idx > shown or idx ~= math.floor(idx) then
-    a11y.abort(string.format('%s is not a number between 1 and %d. Cancelled.',
-                             answer == '' and 'Blank' or answer, shown))
+    if n > max_spoken and answer:lower():sub(1, 1) == 'm' then
+      first = last < n and last + 1 or 1
+      default = tostring(first)
+    else
+      local idx = tonumber(answer)
+      if not idx or idx < 1 or idx > n or idx ~= math.floor(idx) then
+        a11y.abort(string.format('%s is not a number between 1 and %d. Cancelled.',
+                                 answer == '' and 'Blank' or answer, n))
+      end
+      return items[idx], idx
+    end
   end
-  return items[idx], idx
 end
 
 --- Yes/no confirmation. Returns true only on Yes.

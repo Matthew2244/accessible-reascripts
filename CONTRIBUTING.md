@@ -216,7 +216,7 @@ is the one thing a reviewer cannot find out any other way.
 If you add a script, regenerate the ReaPack index in the same commit:
 
 ```bash
-python3 tools/build_index.py --url https://github.com/Matthew2244/accessible-reascripts --branch main
+python3 tools/build_index.py --url https://github.com/Matthew2244/accessible-reascripts
 ```
 
 ## Cutting a release
@@ -229,8 +229,12 @@ behaviour changes, and `VERSION` must never be lower than any of them;
 `build_index.py` refuses if it is.
 
 1. Raise `VERSION`, regenerate the index, and run the three checks.
-2. Commit and push to `main`.
-3. Tag it: `gh release create vX.Y.Z --title "X.Y.Z" --notes-file notes.md`.
+2. Commit, tag the commit `vX.Y.Z`, and push both together:
+   `git tag vX.Y.Z && git push origin main vX.Y.Z`. The index on `main`
+   points every file at that tag, so until the tag is pushed ReaPack gets
+   "not found" for the files.
+3. Publish the release on the tag:
+   `gh release create vX.Y.Z --verify-tag --title "X.Y.Z" --notes-file notes.md`.
 
 ## Finding out what an API actually does
 

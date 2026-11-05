@@ -1,7 +1,7 @@
 --[[
   @description Make variations of selected items (accessible)
   @author Accessible ReaScripts contributors
-  @version 1.0.0
+  @version 1.0.1
   @provides [main] .
   @about
     Turn one sound into a family of near copies. Each selected item gets a
@@ -140,9 +140,10 @@ local function main()
   end
 
   -- Leave the family selected, not the originals, so the next action
-  -- lands on the new copies.
+  -- lands on the new copies. If nothing was made, put the original
+  -- selection back, so "Nothing changed" is true.
   reaper.SelectAllMediaItems(0, false)
-  for _, copy in ipairs(made) do
+  for _, copy in ipairs(#made > 0 and made or sources) do
     reaper.SetMediaItemSelected(copy, true)
   end
 

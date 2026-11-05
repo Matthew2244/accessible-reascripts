@@ -1,7 +1,7 @@
 --[[
   @description Speak automation state (accessible)
   @author Accessible ReaScripts contributors
-  @version 1.0.1
+  @version 1.0.2
   @provides [main] .
   @about
     One spoken sentence describing the automation you are sitting in: the
@@ -93,7 +93,12 @@ local function value_phrase(env, value)
     if db <= a11y.MIN_DB then return 'minus infinity dB' end
     return num(db) .. ' dB'
   end
-  if name:match('^pan') or name:match('^width') then
+  if name:match('^pan') then
+    -- A pan envelope stores left as positive: +1 renders on the left only.
+    if math.abs(value) < 0.0005 then return 'center' end
+    return num(math.abs(value) * 100) .. ' percent ' .. (value > 0 and 'left' or 'right')
+  end
+  if name:match('^width') then
     return num(value * 100) .. ' percent'
   end
   -- A plugin parameter is stored in the plugin's own range, which is not

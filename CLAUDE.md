@@ -62,7 +62,7 @@ Facts measured in REAPER 7.82 that are easy to get wrong:
 If you add a script, regenerate the index in the same commit:
 
 ```bash
-python3 tools/build_index.py --url https://github.com/Matthew2244/accessible-reascripts --branch main
+python3 tools/build_index.py --url https://github.com/Matthew2244/accessible-reascripts
 ```
 
 ## Platforms
@@ -107,9 +107,11 @@ Two things to know before touching path handling:
 
 ## Maintainer notes
 
-**Going public needs no code changes.** `index.xml` already points at
-`raw/main/`, so ReaPack starts working the moment visibility flips — there is
-nothing to regenerate. Verified before the repo was opened up: the git history
+**The repo is public** (since 2026-11-04). ReaPack reads `index.xml` from
+`raw/main/`, and each file in it points at the release tag `v<VERSION>`, so
+a version's files never change after it ships. Push the tag with the
+commit, or ReaPack gets "not found" for the files. Verified before the repo
+was opened up: the git history
 has only ever contained the files currently tracked, and
 `tools/fixtures/track_templates.txt` — which holds real client and
 collaborator names — has never been committed on any branch. Re-run that check
@@ -124,7 +126,7 @@ git log --all --pretty=format: --name-only --diff-filter=A | sort -u
 is faster:
 
 ```bash
-python3 tools/build_index.py --url https://github.com/Matthew2244/accessible-reascripts --branch main
+python3 tools/build_index.py --url https://github.com/Matthew2244/accessible-reascripts
 ```
 
 **Bump `@version` when a script's behaviour changes**, and `a11y.VERSION` when

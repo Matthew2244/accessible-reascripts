@@ -1,7 +1,7 @@
 --[[
   @description Insert sound by name (accessible)
   @author Accessible ReaScripts contributors
-  @version 1.0.0
+  @version 1.0.1
   @provides [main] .
   @about
     Type part of a sound's name and insert it from your sample library
@@ -137,7 +137,10 @@ local function main()
 
   reaper.Undo_BeginBlock()
   reaper.SetOnlyTrackSelected(track)
-  reaper.InsertMedia(chosen.path, 0)
+  -- Mode 0 means REAPER's last touched track, which is not always the
+  -- selected one. 512 with the track index in the high word names it.
+  local index = math.floor(reaper.GetMediaTrackInfo_Value(track, 'IP_TRACKNUMBER')) - 1
+  reaper.InsertMedia(chosen.path, 512 | (index << 16))
   reaper.Undo_EndBlock('Insert sound "' .. a11y.basename(chosen.path, true) .. '"', -1)
 
   -- Never claim success unverified: count the track's items before and

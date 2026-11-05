@@ -1,7 +1,7 @@
 --[[
   @description Ramp envelope over time selection (accessible)
   @author Accessible ReaScripts contributors
-  @version 1.0.1
+  @version 1.0.2
   @provides [main] .
   @about
     Ramp the selected envelope from one value to another across the time
@@ -17,7 +17,8 @@
     Values are typed in the units you think in:
 
       Volume and trim       decibels, so -6 means minus six dB
-      Pan and width         percent, -100 to 100
+      Pan                   percent, -100 hard left to 100 hard right
+      Width                 percent, -100 to 100
       Mute                  0 or 1
       Plugin parameters     percent of the parameter's range, 0 to 100
       Anything else         the envelope's own numbers, so semitones for
@@ -108,6 +109,12 @@ local function to_human(env, kind, value, fxp)
   elseif kind == 'fxparam' then
     local lo, hi = param_range(fxp)
     return (value - lo) / (hi - lo) * 100
+  elseif kind == 'pan' then
+    -- A pan envelope stores left as positive, the opposite of the track's
+    -- pan control. Measured: a point at +1 renders on the left channel
+    -- only, and REAPER shows it as 100%L. Typed values follow the control,
+    -- so minus is left.
+    return -value * 100
   end
   return value * 100
 end
@@ -121,6 +128,8 @@ local function from_human(env, kind, human, fxp)
     return human >= 0.5 and 1 or 0
   elseif kind == 'raw' then
     return human
+  elseif kind == 'pan' then
+    return math.max(-1, math.min(1, -human / 100))
   elseif kind == 'fxparam' then
     local lo, hi = param_range(fxp)
     return lo + math.max(0, math.min(1, human / 100)) * (hi - lo)
@@ -147,6 +156,10 @@ local function describe(env, kind, value, fxp)
     return round(human, 1) .. ' dB'
   end
   if kind == 'raw' then return round(human, 2) end
+  if kind == 'pan' then
+    if math.abs(human) < 0.05 then return 'center' end
+    return round(math.abs(human), 1) .. ' percent ' .. (human < 0 and 'left' or 'right')
+  end
   return round(human, 1) .. ' percent'
 end
 

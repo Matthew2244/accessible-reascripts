@@ -1,7 +1,7 @@
 --[[
   @description Speak project summary (accessible)
   @author Accessible ReaScripts contributors
-  @version 1.0.1
+  @version 1.0.2
   @provides [main] .
   @about
     Speaks an overview of the current project in one keystroke: name and
@@ -61,8 +61,14 @@ local function missing_media()
     -- In-project MIDI has no file on disk and is not "missing".
     if take and not reaper.TakeIsMIDI(take) then
       local src = reaper.GetMediaItemTake_Source(take)
+      -- A reversed or section source has no file name of its own; the
+      -- file belongs to its parent.
+      local path = src and reaper.GetMediaSourceFileName(src, '')
+      while src and (path == nil or path == '') and reaper.GetMediaSourceParent(src) do
+        src = reaper.GetMediaSourceParent(src)
+        path = reaper.GetMediaSourceFileName(src, '')
+      end
       if src then
-        local path = reaper.GetMediaSourceFileName(src, '')
         if path and path ~= '' then
           local known = seen[path]
           if known == nil then
