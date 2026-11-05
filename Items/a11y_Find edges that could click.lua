@@ -1,7 +1,7 @@
 --[[
   @description Find edges that could click (accessible)
   @author Accessible ReaScripts contributors
-  @version 1.0.0
+  @version 1.0.1
   @provides [main] .
   @about
     Walks every item in the project and finds the item edges that are not
@@ -55,11 +55,12 @@ local WINDOW = 0.03       -- how much audio at the edge counts as "on the edge"
 local TOUCH = 0.0005      -- closer than this and two items are butting, not apart
 local MAX_SPOKEN = 8
 
---- The fade Reaper will actually apply at an edge. An auto-crossfade of
---- zero or more overrides the item's own fade; -1 means there is none.
+--- The fade Reaper will actually apply at an edge. An auto-crossfade
+--- longer than zero overrides the item's own fade; 0 means there is none,
+--- which is what an ordinary item reads.
 local function effective_fade(item, which)
   local auto = reaper.GetMediaItemInfo_Value(item, 'D_FADE' .. which .. 'LEN_AUTO')
-  if auto >= 0 then return auto, true end
+  if auto > 0 then return auto, true end
   return reaper.GetMediaItemInfo_Value(item, 'D_FADE' .. which .. 'LEN'), false
 end
 
@@ -67,15 +68,15 @@ end
 --- one end of the item. Returns dB, or nil if the audio could not be read.
 local function level_at_edge(item, take, at_start)
   if not take or reaper.TakeIsMIDI(take) then return nil end
+  -- Peaks are read in project time, so the item's own position and
+  -- length are all that is needed; REAPER applies offset and rate itself.
+  local pos = reaper.GetMediaItemInfo_Value(item, 'D_POSITION')
   local length = reaper.GetMediaItemInfo_Value(item, 'D_LENGTH')
-  local offset = reaper.GetMediaItemTakeInfo_Value(take, 'D_STARTOFFS')
-  local rate = reaper.GetMediaItemTakeInfo_Value(take, 'D_PLAYRATE')
-  if not rate or rate <= 0 then rate = 1 end
-  local window = math.min(WINDOW, length) * rate
+  local window = math.min(WINDOW, length)
   if window <= 0 then return nil end
-  local from = offset
+  local from = pos
   if not at_start then
-    from = math.max(0, offset + length * rate - window)
+    from = pos + length - window
   end
   local levels = a11y.read_levels(take, RATE, from, window)
   if #levels == 0 then return nil end
@@ -149,7 +150,7 @@ local function collect_edges(max_fade)
 end
 
 local function describe(e)
-  return string.format('%s at %s on %s, %s, audio %.1f dB',
+  return string.format('%s at %s on track %s, %s, audio %.1f dB',
                        e.which == 'IN' and 'start' or 'end',
                        reaper.format_timestr(e.time, ''),
                        e.track,
@@ -163,10 +164,10 @@ local function main()
   end
 
   local answer = a11y.prompt('Find edges that could click',
-                             'Flag fades shorter than (milliseconds)',
+                             'Flag fades this short or shorter (milliseconds)',
                              a11y.recall('click_fade_ms', '10'))
   if not answer then a11y.abort('Left it alone.') end
-  local ms = tonumber((answer:gsub('[^%d%.]', '')))
+  local ms = tonumber((answer:gsub('[^%d%.%-]', '')))
   if not ms or ms < 0 then
     a11y.abort('I could not read "' .. answer .. '" as a number of milliseconds.')
   end
@@ -191,7 +192,7 @@ local function main()
 
   if #open_edges == 0 then
     a11y.speak(string.format(
-      'Checked %s. No open edge has a fade under %g milliseconds with sound on it.%s%s',
+      'Checked %s. No open edge has a fade of %g milliseconds or less with sound on it.%s%s',
       a11y.plural(items, 'item'), ms, joins_note, note))
     return
   end
@@ -219,7 +220,7 @@ local function main()
   local reply = a11y.prompt('Lengthen fades', 'Fade length (milliseconds)',
                             a11y.recall('click_fix_ms', '20'))
   if not reply then a11y.abort('Cancelled. Nothing changed.') end
-  local want = tonumber((reply:gsub('[^%d%.]', '')))
+  local want = tonumber((reply:gsub('[^%d%.%-]', '')))
   if not want or want <= 0 then
     a11y.abort('I could not read "' .. reply .. '" as a number of milliseconds. Nothing changed.')
   end
@@ -227,7 +228,7 @@ local function main()
   local seconds = want / 1000
 
   reaper.Undo_BeginBlock()
-  local changed, shortened = 0, 0
+  local changed, shortened, had_more, no_room = 0, 0, 0, 0
   for _, e in ipairs(open_edges) do
     local len = reaper.GetMediaItemInfo_Value(e.item, 'D_LENGTH')
     local other = reaper.GetMediaItemInfo_Value(
@@ -238,9 +239,14 @@ local function main()
     if apply < seconds then shortened = shortened + 1 end
     if apply > e.fade then
       reaper.SetMediaItemInfo_Value(e.item, 'D_FADE' .. e.which .. 'LEN', apply)
-      -- An auto-crossfade value would override what we just set.
-      reaper.SetMediaItemInfo_Value(e.item, 'D_FADE' .. e.which .. 'LEN_AUTO', -1)
+      -- An auto-crossfade value would override what we just set. 0 is
+      -- REAPER's own value for none.
+      reaper.SetMediaItemInfo_Value(e.item, 'D_FADE' .. e.which .. 'LEN_AUTO', 0)
       changed = changed + 1
+    elseif e.fade >= seconds then
+      had_more = had_more + 1
+    else
+      no_room = no_room + 1
     end
   end
   reaper.UpdateArrange()
@@ -248,9 +254,13 @@ local function main()
 
   local msg = string.format('Set %s of fade on %s.', a11y.time_phrase(seconds),
                             a11y.plural(changed, 'edge'))
-  if changed < #open_edges then
-    msg = msg .. string.format(' %s already had more than that and were left alone.',
-                               a11y.plural(#open_edges - changed, 'edge was', 'edges were'))
+  if had_more > 0 then
+    msg = msg .. string.format(' %s already as long as that, and left alone.',
+                               a11y.plural(had_more, 'edge was', 'edges were'))
+  end
+  if no_room > 0 then
+    msg = msg .. string.format(' %s on an item with no room for a longer fade, and left alone.',
+                               a11y.plural(no_room, 'edge was', 'edges were'))
   end
   if shortened > 0 then
     msg = msg .. string.format(' %s too short to hold the whole fade, so it was shortened to fit there.',

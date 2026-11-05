@@ -1,7 +1,7 @@
 --[[
   @description Create send bus from selected tracks (accessible)
   @author Accessible ReaScripts contributors
-  @version 1.0.0
+  @version 1.0.1
   @provides [main] .
   @about
     Make a new bus and send every selected track to it, in one move: type
@@ -64,7 +64,14 @@ local function main()
 
   local made = 0
   for _, src in ipairs(sources) do
-    if reaper.CreateTrackSend(src, bus) >= 0 then made = made + 1 end
+    local idx = reaper.CreateTrackSend(src, bus)
+    if idx >= 0 then
+      -- New sends follow the send defaults in REAPER's preferences, so the
+      -- 0 dB post fader promised below is set rather than assumed.
+      reaper.SetTrackSendInfo_Value(src, 0, idx, 'D_VOL', 1)
+      reaper.SetTrackSendInfo_Value(src, 0, idx, 'I_SENDMODE', 0)
+      made = made + 1
+    end
   end
 
   reaper.SetOnlyTrackSelected(bus)

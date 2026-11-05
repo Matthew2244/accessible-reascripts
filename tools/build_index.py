@@ -19,6 +19,12 @@ Usage:
 Writes index.xml at the repo root. --check writes nothing and reports whether
 the committed index still matches the scripts on disk, which is the one thing
 about adding a script that is easy to forget and impossible to notice by ear.
+
+The package version comes from the VERSION file at the repo root. It used to
+be the highest @version of any script, which meant a release that added a
+script at 1.0.0, or fixed one below the top version, produced the same
+package version as before, and ReaPack users were never offered it. Seven
+scripts went unshipped that way. Raise VERSION for every release.
 """
 
 from __future__ import annotations
@@ -147,11 +153,24 @@ def build(root: pathlib.Path, base_url: str, branch: str, version: str) -> str:
     return minidom.parseString(raw).toprettyxml(indent="  ", encoding="utf-8").decode()
 
 
+def version_key(v: str) -> list[int]:
+    return [int(p) for p in re.findall(r"\d+", v) or [0]]
+
+
 def default_version(root: pathlib.Path) -> str:
-    """The highest @version any script declares."""
+    """The package version: the VERSION file, which must be at least as
+    high as any script's own @version. Without the file, the highest
+    @version, as before."""
     versions = [h.get("version", "0.0.0") for _, h in collect(root)]
-    return max(versions, key=lambda v: [int(p) for p in
-                                        re.findall(r"\d+", v) or [0]])
+    highest = max(versions, key=version_key)
+    vfile = root / "VERSION"
+    if not vfile.exists():
+        return highest
+    version = vfile.read_text(encoding="utf-8").strip()
+    if version_key(version) < version_key(highest):
+        raise SystemExit(f"VERSION says {version}, but a script declares "
+                         f"@version {highest}. Raise VERSION.")
+    return version
 
 
 def target_from_index(path: pathlib.Path) -> tuple[str, str]:

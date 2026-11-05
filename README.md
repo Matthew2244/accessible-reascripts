@@ -40,9 +40,11 @@ send bus script. Clear the box to browse instead: first the categories, then
 the scripts in the one you pick, so nothing is ever more than two short lists
 away.
 
-It also remembers you. The box comes prefilled with your last search, so
-running the same tool again is two presses of Enter, and the last three
-scripts you ran sit at the top of browsing as a Recent group.
+It also remembers you, across restarts. The box comes prefilled with your
+last search, so running the same tool again is two presses of Enter, and the
+last three scripts you ran sit at the top of browsing as a Recent group.
+Scripts whose names match what you typed come first, then scripts that only
+mention it.
 
 The menu discovers scripts from the folders on disk, so anything added to
 the collection later shows up in it automatically.
@@ -134,8 +136,9 @@ Jump to a track by typing part of its name, instead of arrowing through the
 track list. In a forty-track session that is two keystrokes instead of a lot
 of counting. You can also just type a track number.
 
-The chosen track becomes the only selected track, so whatever you do next
-lands on it, and only on it.
+Typing a number puts that track first, so `3` finds track 3 rather than
+tracks 30 to 39. The chosen track becomes the only selected track, so
+whatever you do next lands on it, and only on it.
 
 ### Go to marker or region by name
 
@@ -145,6 +148,16 @@ stepping through them one at a time. You can also just type a marker's number.
 Choosing a region sets the time selection to that region as well as moving the
 edit cursor, so you can play or render it immediately. Markers only move the
 cursor.
+
+### Speak what is sounding here
+
+What is actually under the edit cursor, right now, on every track at once.
+For each track with something at the cursor you hear the track, the item,
+how far into it you are and how much of it is left. Muted tracks and muted
+items are named as muted rather than left out, because "nothing here" and
+"here but silent" are different problems.
+
+This script only reads. It changes nothing.
 
 ### Speak project summary
 
@@ -159,6 +172,20 @@ This script only reads. It changes nothing.
 It is useful in a custom action straight after
 `File: Save new version of project`, so you hear which version you just landed
 on.
+
+### Where does this project really end
+
+Finds the last moment anything is actually audible, and compares it with
+where the project stops and where a render would stop. If those disagree
+you are about to bounce dead air onto the end of your piece. Render bounds
+set to a fixed range or to the time selection are checked, render tail
+included.
+
+It reads the items' own audio, so a tail made only by a reverb plugin is not
+counted, and it says so. Muted items and items on muted tracks are left out,
+because they are not in a render.
+
+This script only reads. It changes nothing.
 
 ### Rename selected tracks
 
@@ -192,7 +219,7 @@ This script only reads. It changes nothing.
 
 Make a new bus and send every selected track to it, in one move: type a
 name, and the bus appears at the end of the project with a post-fader send
-from each selected track at 0 dB. The classic use is a shared reverb or a
+from each selected track at 0 dB, whatever your send defaults say. The classic use is a shared reverb or a
 scene-wide effect. Select the twelve layers of a scene, run this once, and
 put the reverb on the bus it made.
 
@@ -204,8 +231,8 @@ next thing you do, adding the reverb, lands on it. One undo step.
 
 Hear what is actually selected: each item's name, the track it sits on,
 where it starts, how long it is, its fades, and anything on the active take
-that changes the sound: pitch shift, playback rate, an alternate take being
-active, a mute.
+that changes the sound: pitch shift, playback rate, reverse, a mute, and
+which take is active when there is more than one.
 
 Built for layered sound design, where six items stacked across six tracks
 are one sound and you want to audit the whole stack by ear without arrowing
@@ -221,8 +248,9 @@ typing `0.02` is faster and lands the same on all forty layers of a scene.
 
 Leave a field blank to leave that fade alone, so you can set every fade out
 without touching the fade ins. A fade longer than an item is shortened to
-fit, and the summary says on how many items that happened. Fade shapes are
-not changed. One undo step.
+fit, and the summary says on how many items that happened. Where REAPER made
+an automatic crossfade, the length you type replaces it, so the fade you set
+is the one you hear. Fade shapes are not changed. One undo step.
 
 ### Make variations of selected items
 
@@ -246,6 +274,52 @@ into each copy.
 The copies end up selected, so the next thing you do, like setting fades on
 the whole family, lands on them and not the original. The original is never
 changed. One undo step.
+
+### Ripple cut with crossfades
+
+Takes the time selection out of the selected tracks, or every track if none
+is selected, closes the gap, and crossfades every join it made, at a length
+you type. A butt splice in the middle of an ambience bed is audible even when
+the waveform looks innocent.
+
+Where a take has audio before its start it gets a true overlapping
+crossfade. Where it doesn't, it gets matched fades, and the summary says how
+many of each. If there wasn't enough audio for the whole length you asked
+for, it says the shortest it managed. Only items move. Envelopes, markers,
+regions and tempo stay put, so automation after the cut sits later than the
+audio it belonged to. One undo step.
+
+### Find edges that could click
+
+Walks every item in the project and finds the edges with no real fade and
+audio sitting right on them. Those are the ones that tick. It speaks them
+loudest first, with the track, the time and the level at the edge, then
+offers to lengthen those fades in one undo step.
+
+Items that butt exactly end to start are reported separately: lengthening
+their fades only widens the dip, and the fix is to overlap them, which it
+leaves to you. Edges that already crossfade are skipped. It reads each
+item's own audio, not the mix.
+
+### Find the loud bits
+
+Asks for a level, minus 1 dB unless you change it, then speaks every moment
+in the selected items that goes over it, with the time and how loud it got,
+loudest first. It reads each item's own audio, so if nothing here is over
+the line but your master is clipping, the level is being added further down
+the chain.
+
+This script only reads. It changes nothing.
+
+### Speak where the sound is
+
+Walks the selected item's audio and tells you where the sound actually
+lives: each stretch of sound with its peak, and how long the quiet is
+between them, counted from the start of the item. This is how you find the
+chime buried at the head of a file, or notice that a stem called "train" is
+thirty seconds of nothing followed by a door.
+
+This script only reads. It changes nothing.
 
 ### Line up WING-LIVE recordings
 
@@ -330,8 +404,12 @@ selection: a fade, a filter sweep, a level move under a voiceover. Both values
 and the curve are asked for in one dialog, prefilled with what the envelope is
 doing now, so leaving a field alone changes nothing.
 
-Values are typed in the units you think in: decibels for volume, percent for
-pan, width and plugin parameters, 0 or 1 for mute. Curve shapes are words
+Values are typed in the units you think in: decibels for volume and trim,
+percent for pan and width, percent of the parameter's own range for plugin
+parameters, 0 or 1 for mute. Anything else, such as a take pitch envelope or
+the tempo map, uses its own numbers, so semitones or beats per minute. On a
+take envelope the time selection still means project time; the script
+works out where that falls inside the item. Curve shapes are words
 rather than numbers: `linear`, `slow`, `fast start`, `fast end`, `square`,
 `bezier`.
 
@@ -394,11 +472,8 @@ It arrives as a single package, every script plus the shared library, so
 there is nothing to keep in sync by hand, and updates come through ReaPack
 like any other repository.
 
-**While this repository is private, ReaPack cannot reach it.** ReaPack fetches
-the index with a plain HTTPS request and has no way to send a GitHub token, so
-a private repository simply answers "not found". The index is generated and
-committed regardless, so this route starts working the moment the repository
-goes public, with nothing to change and nothing to regenerate.
+Each release raises the package version, which is how ReaPack knows there
+is something new. Releases are listed on the repository's Releases page.
 
 ### By cloning
 

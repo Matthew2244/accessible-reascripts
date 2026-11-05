@@ -1,7 +1,7 @@
 --[[
   @description Rename selected tracks with a numbered pattern (accessible)
   @author Accessible ReaScripts contributors
-  @version 1.0.0
+  @version 1.0.1
   @provides [main] .
   @about
     Rename every selected track from one dialog, instead of confirming a
@@ -80,8 +80,11 @@ local function main()
 
   local start = tonumber(start_text)
   if start == nil or start ~= math.floor(start) then
+    if start_text == '' then
+      a11y.abort('The start number was blank. Nothing renamed.')
+    end
     a11y.abort(string.format('Start number %s is not a whole number. Nothing renamed.',
-                             start_text == '' and '(blank)' or start_text))
+                             start_text))
   end
 
   -- Renaming several tracks to one identical name is almost never what

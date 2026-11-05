@@ -42,9 +42,22 @@ reading the REAPER and OSARA binaries — so run it locally before opening a
 pull request.
 
 **None of these test behaviour inside REAPER.** Anything that touches a real
-project still needs hand-testing on a scratch project, which you cannot do.
-When you finish a script, say exactly what remains to be tested by hand rather
+project still needs testing on a scratch project. When you finish a script,
+say exactly what was tested and what remains to be tested by hand rather
 than reporting it as done.
+
+Facts measured in REAPER 7.82 that are easy to get wrong:
+
+- `GetMediaItemTake_Peaks` takes a **project** time, not a source time. An
+  item at 30 seconds with a sound one second in reads that sound at 31.
+  Three listening scripts passed the take offset instead until 1.3.0, so
+  they read the wrong stretch of any item not at position 0.
+- A **take** envelope's point times count from the item's start, in the
+  take's own time, so at playback rate 2 they are doubled.
+  `a11y.envelope_time` converts. `GetTrackSendName` counts hardware outputs
+  before sends; use `P_DESTTRACK` instead.
+- `D_FADEINLEN_AUTO` reads 0 on an ordinary item, meaning no automatic fade,
+  and 0 is also how you clear one. Not -1.
 
 If you add a script, regenerate the index in the same commit:
 
@@ -115,8 +128,11 @@ python3 tools/build_index.py --url https://github.com/Matthew2244/accessible-rea
 ```
 
 **Bump `@version` when a script's behaviour changes**, and `a11y.VERSION` when
-the library's does. The index takes the highest `@version` it finds, so a
-change with no bump ships to ReaPack users as no change at all.
+the library's does. **And raise `VERSION` at the repo root for every
+release.** That file is the package version ReaPack sees. It used to be the
+highest `@version` of any script, so adding a script at 1.0.0, or fixing one
+below the top version, shipped nothing: seven scripts sat unreleased at
+1.2.1 that way. CONTRIBUTING.md has the release steps.
 
 ## Do not reimplement REAPER or SWS
 

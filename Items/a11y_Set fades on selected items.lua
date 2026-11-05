@@ -1,7 +1,7 @@
 --[[
   @description Set fades on selected items (accessible)
   @author Accessible ReaScripts contributors
-  @version 1.0.0
+  @version 1.0.1
   @provides [main] .
   @about
     Set the fade in and fade out of every selected item to an exact length,
@@ -9,7 +9,9 @@
     typing 0.02 is faster and lands the same on all forty layers of a scene.
 
     Leave a field blank to leave that fade alone, so you can set every fade
-    out without touching the fade ins. Fade shapes are not changed.
+    out without touching the fade ins. Fade shapes are not changed. Where
+    two items overlap and REAPER made the crossfade for you, the length you
+    type replaces it, so the fade you set is the one you hear.
 
     One undo step for the whole edit.
 ]]
@@ -77,10 +79,14 @@ local function main()
     if fadein ~= nil then
       if fadein > len then item_clipped = true end
       reaper.SetMediaItemInfo_Value(item, 'D_FADEINLEN', math.min(fadein, len))
+      -- An automatic crossfade overrides the item's own fade, so without
+      -- this the new length would be set and never heard.
+      reaper.SetMediaItemInfo_Value(item, 'D_FADEINLEN_AUTO', 0)
     end
     if fadeout ~= nil then
       if fadeout > len then item_clipped = true end
       reaper.SetMediaItemInfo_Value(item, 'D_FADEOUTLEN', math.min(fadeout, len))
+      reaper.SetMediaItemInfo_Value(item, 'D_FADEOUTLEN_AUTO', 0)
     end
     if item_clipped then clipped = clipped + 1 end
   end
@@ -89,10 +95,10 @@ local function main()
 
   local parts = {}
   if fadein ~= nil then
-    parts[#parts + 1] = string.format('fade in %g seconds', fadein)
+    parts[#parts + 1] = 'fade in ' .. a11y.time_phrase(fadein)
   end
   if fadeout ~= nil then
-    parts[#parts + 1] = string.format('fade out %g seconds', fadeout)
+    parts[#parts + 1] = 'fade out ' .. a11y.time_phrase(fadeout)
   end
   local msg = string.format('Set %s on %s.', a11y.list_phrase(parts),
                             a11y.plural(count, 'item'))

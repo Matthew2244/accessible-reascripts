@@ -7,9 +7,9 @@
     Builds a lo-fi playback chain in one action, in the right order, on
     every selected track. Three chains:
 
-      Vinyl     Elliptical, Acceleration2, GrooveWear, Vinyl Noise
-      Cassette  Dubly3, CHOWTapeModel, Vinyl Noise set for tape hiss
-      Noise     Vinyl Noise on its own
+      Vinyl       Elliptical, Acceleration2, GrooveWear, Vinyl Noise
+      Cassette    Dubly3, CHOWTapeModel, Vinyl Noise set for tape hiss
+      Noise only  Vinyl Noise on its own
 
     Only the JSFX is dialled in by the script. The Airwindows steps come
     from Airwindows Consolidated, which is one plugin holding every

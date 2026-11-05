@@ -1,7 +1,7 @@
 --[[
   @description Speak automation state (accessible)
   @author Accessible ReaScripts contributors
-  @version 1.0.0
+  @version 1.0.1
   @provides [main] .
   @about
     One spoken sentence describing the automation you are sitting in: the
@@ -39,6 +39,21 @@ local AUTOMATION_MODES = {
   [5] = 'latch preview',
 }
 
+-- The global override shares the numbers 0 to 4 but means bypass by 5.
+local OVERRIDE_MODES = {
+  [0] = 'trim and read',
+  [1] = 'read',
+  [2] = 'touch',
+  [3] = 'write',
+  [4] = 'latch',
+  [5] = 'bypass',
+}
+
+--- A number without a trailing ".0": Lua 5.4 prints 2.0 for a whole float.
+local function num(n)
+  return (string.format('%.2f', n):gsub('0+$', ''):gsub('%.$', ''))
+end
+
 local function track_name(tr)
   local _, name = reaper.GetSetMediaTrackInfo_String(tr, 'P_NAME', '', false)
   if name == nil or name == '' then return 'unnamed track' end
@@ -63,39 +78,58 @@ local function chunk_flag(env, key)
   return value == '1'
 end
 
-local function round(n)
-  return math.floor(n * 100 + 0.5) / 100
-end
 
---- The value under the cursor, in the units a person thinks in.
+--- The value under the cursor, in the units a person thinks in. These are
+--- the same units Ramp envelope over time selection asks for, so what you
+--- hear here is what you would type there.
 local function value_phrase(env, value)
   local name = envelope_name(env):lower()
   if name == 'mute' then
     return value >= 0.5 and 'muted' or 'unmuted'
   end
-  if name == 'volume' or name == 'volume (pre-fx)' then
+  if name == 'volume' or name == 'volume (pre-fx)' or name == 'trim volume' then
     local mode = reaper.GetEnvelopeScalingMode(env)
     local db = a11y.gain_to_db(reaper.ScaleFromEnvelopeMode(mode, value))
-    return round(db) .. ' dB'
+    if db <= a11y.MIN_DB then return 'minus infinity dB' end
+    return num(db) .. ' dB'
   end
-  return round(value * 100) .. ' percent'
+  if name:match('^pan') or name:match('^width') then
+    return num(value * 100) .. ' percent'
+  end
+  -- A plugin parameter is stored in the plugin's own range, which is not
+  -- always 0 to 1, so percent is worked out from that range.
+  local tr, fx, param = reaper.Envelope_GetParentTrack(env)
+  if tr and fx and fx >= 0 and param and param >= 0 then
+    local _, lo, hi = reaper.TrackFX_GetParam(tr, fx, param)
+    if lo and hi and hi > lo then
+      return num((value - lo) / (hi - lo) * 100) .. ' percent'
+    end
+  end
+  -- Take pitch, playrate, tempo and the like: their own numbers.
+  return num(value)
 end
 
 local function main()
-  local tr = reaper.GetSelectedTrack(0, 0) or reaper.GetLastTouchedTrack()
+  local env = reaper.GetSelectedEnvelope(0)
+  -- The selected envelope can sit on any track, or on a take, so the track
+  -- named is the one it belongs to, not whichever track is selected.
+  local tr = env and reaper.Envelope_GetParentTrack(env)
+  local take = env and not tr and reaper.Envelope_GetParentTake(env)
+  if take then tr = reaper.GetMediaItemTake_Track(take) end
+  tr = tr or reaper.GetSelectedTrack(0, 0) or reaper.GetLastTouchedTrack()
   if not tr then
     a11y.abort('No track selected.')
   end
 
   local name = track_name(tr)
-  local env = reaper.GetSelectedEnvelope(0)
   if not env then
     a11y.speak(name .. ', no envelope selected. Use automate plugin parameter ' ..
                'by name, or the OSARA action for selecting the next envelope.')
     return
   end
 
-  local parts = { string.format('%s on %s.', envelope_name(env), name) }
+  local parts = { string.format('%s on %s%s.', envelope_name(env),
+                                take and 'an item on ' or '', name) }
 
   local mode = math.floor(reaper.GetMediaTrackInfo_Value(tr, 'I_AUTOMODE'))
   parts[#parts + 1] = 'Automation mode ' ..
@@ -104,7 +138,7 @@ local function main()
   local override = reaper.GetGlobalAutomationOverride()
   if override and override >= 0 then
     parts[#parts + 1] = 'Global override is ' ..
-                        (AUTOMATION_MODES[override] or ('mode ' .. override)) .. '.'
+                        (OVERRIDE_MODES[override] or ('mode ' .. override)) .. '.'
   end
 
   -- Only worth saying when it is not the case, since armed and visible are
@@ -115,7 +149,8 @@ local function main()
   local count = reaper.CountEnvelopePoints(env)
   parts[#parts + 1] = a11y.plural(count, 'point') .. '.'
 
-  local cursor = reaper.GetCursorPosition()
+  -- A take envelope keeps its points in the item's own time.
+  local cursor, rate = a11y.envelope_time(env, reaper.GetCursorPosition())
   local _, value = reaper.Envelope_Evaluate(env, cursor, 44100, 0)
   parts[#parts + 1] = 'At the cursor, ' .. value_phrase(env, value) .. '.'
 
@@ -124,11 +159,11 @@ local function main()
   if previous and previous >= 0 then
     local ok, time = reaper.GetEnvelopePoint(env, previous)
     if ok and time then
-      local gap = cursor - time
+      local gap = (cursor - time) / rate
       if gap < 0.005 then
         parts[#parts + 1] = 'Sitting on a point.'
       else
-        parts[#parts + 1] = 'Previous point ' .. round(gap) .. ' seconds back.'
+        parts[#parts + 1] = 'Previous point ' .. a11y.time_phrase(gap) .. ' back.'
       end
     end
   else
@@ -139,7 +174,7 @@ local function main()
   if next_index < count then
     local ok, time = reaper.GetEnvelopePoint(env, next_index)
     if ok and time and time > cursor then
-      parts[#parts + 1] = 'Next point ' .. round(time - cursor) .. ' seconds ahead.'
+      parts[#parts + 1] = 'Next point ' .. a11y.time_phrase((time - cursor) / rate) .. ' ahead.'
     end
   else
     parts[#parts + 1] = 'No point after the cursor.'
@@ -148,7 +183,7 @@ local function main()
   local start_time, end_time = reaper.GetSet_LoopTimeRange(false, false, 0, 0, false)
   if end_time > start_time then
     parts[#parts + 1] = 'Time selection ' ..
-                        a11y.duration_phrase(end_time - start_time) .. ', ready to ramp.'
+                        a11y.time_phrase(end_time - start_time) .. ', ready to ramp.'
   else
     parts[#parts + 1] = 'No time selection.'
   end

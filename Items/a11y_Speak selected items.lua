@@ -1,14 +1,14 @@
 --[[
   @description Speak selected items (accessible)
   @author Accessible ReaScripts contributors
-  @version 1.0.0
+  @version 1.0.1
   @provides [main] .
   @about
     One keystroke and you hear what is actually selected: each item's name,
     the track it sits on, where it starts, how long it is, its fades, and
     anything applied to the active take that changes the sound: pitch
-    shift, playback rate, reverse, mute, or a take other than the last one
-    being active.
+    shift, playback rate, reverse, mute, and which take is active when
+    there is more than one.
 
     Built for layered sound design work, where six items stacked across
     six tracks are one sound and you want to audit the whole stack by ear
@@ -34,17 +34,7 @@ end
 -- count. Beyond this a single utterance stops being reviewable.
 local MAX_SPOKEN = 8
 
---- Seconds as speech: short times keep millisecond precision, longer ones
---- read as minutes and seconds. "0.250 seconds" matters for a fade;
---- "3 minutes 12 seconds" matters for an ambience bed.
-local function time_phrase(seconds)
-  if seconds < 60 then
-    local s = string.format('%.3f', seconds)
-    s = s:gsub('0+$', ''):gsub('%.$', '')
-    return s .. ' seconds'
-  end
-  return a11y.duration_phrase(seconds)
-end
+local time_phrase = a11y.time_phrase
 
 --- Everything about one item worth hearing, as one sentence.
 local function describe(item)
@@ -54,8 +44,13 @@ local function describe(item)
 
   local pos = reaper.GetMediaItemInfo_Value(item, 'D_POSITION')
   local len = reaper.GetMediaItemInfo_Value(item, 'D_LENGTH')
-  local fadein = reaper.GetMediaItemInfo_Value(item, 'D_FADEINLEN')
-  local fadeout = reaper.GetMediaItemInfo_Value(item, 'D_FADEOUTLEN')
+  -- An automatic crossfade, when there is one, is the fade REAPER plays.
+  local function fade(which)
+    local auto = reaper.GetMediaItemInfo_Value(item, 'D_FADE' .. which .. 'LEN_AUTO')
+    if auto > 0 then return auto end
+    return reaper.GetMediaItemInfo_Value(item, 'D_FADE' .. which .. 'LEN')
+  end
+  local fadein, fadeout = fade('IN'), fade('OUT')
   local muted = reaper.GetMediaItemInfo_Value(item, 'B_MUTE') > 0
 
   local take = reaper.GetActiveTake(item)
@@ -86,7 +81,13 @@ local function describe(item)
       parts[#parts + 1] = string.format('pitched %+.2f semitones', pitch)
     end
     if math.abs(rate - 1.0) > 0.001 then
-      parts[#parts + 1] = string.format('rate %.3f', rate)
+      parts[#parts + 1] = string.format('rate %s',
+        (string.format('%.3f', rate):gsub('0+$', ''):gsub('%.$', '')))
+    end
+    local source = reaper.GetMediaItemTake_Source(take)
+    if source then
+      local _, _, _, reversed = reaper.PCM_Source_GetSectionInfo(source)
+      if reversed then parts[#parts + 1] = 'reversed' end
     end
     local takes = reaper.CountTakes(item)
     if takes > 1 then

@@ -131,11 +131,18 @@ appear in the ReaScript console rather than vanishing.
 `Lib/a11y.lua`, all documented inline:
 
 - Speech: `speak`, `abort`, `run`, `has_osara`
-- Text: `plural`, `list_phrase`, `duration_phrase`, `number_pattern`
+- Text: `plural`, `list_phrase`, `track_label`, `duration_phrase`,
+  `time_phrase`, `number_pattern`, `offset_phrase`
 - Matching: `score`, `filter`
-- Dialogs: `prompt`, `pick`, `confirm`
+- Dialogs: `prompt`, `prompt_many`, `pick`, `confirm`
 - Files: `sep`, `path_join`, `basename`, `scan_files`
-- Persistence between runs: `remember`, `recall`
+- Persistence between runs, including restarts: `remember`, `recall`
+- Envelopes: `gain_to_db`, `db_to_gain`, `MIN_DB`, `envelope_shape`,
+  `envelope_time` (project time to a take envelope's own time)
+- Listening to audio: `read_levels` (start time is project time), `spans`,
+  `loud_points`, `SILENCE_DB`
+- Lining up recordings: `align`, with `fft`, `xcorr`, `ncc`, `envelope`,
+  `busiest`, `top_peaks`, `match_confidence` and `next_pow2` underneath
 
 Put reusable pure logic in the library rather than in a script, so it can be
 tested without REAPER.
@@ -211,6 +218,19 @@ If you add a script, regenerate the ReaPack index in the same commit:
 ```bash
 python3 tools/build_index.py --url https://github.com/Matthew2244/accessible-reascripts --branch main
 ```
+
+## Cutting a release
+
+Everything ships as one ReaPack package, and its version comes from the
+`VERSION` file at the repository root. ReaPack only offers an update when
+that number goes up, so raise it for every release, even one that only
+fixes a single script. A script's own `@version` still goes up when its
+behaviour changes, and `VERSION` must never be lower than any of them;
+`build_index.py` refuses if it is.
+
+1. Raise `VERSION`, regenerate the index, and run the three checks.
+2. Commit and push to `main`.
+3. Tag it: `gh release create vX.Y.Z --title "X.Y.Z" --notes-file notes.md`.
 
 ## Finding out what an API actually does
 

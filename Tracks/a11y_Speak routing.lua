@@ -1,7 +1,7 @@
 --[[
   @description Speak routing (accessible)
   @author Accessible ReaScripts contributors
-  @version 1.0.0
+  @version 1.0.1
   @provides [main] .
   @about
     One keystroke and you hear where the selected track's audio actually
@@ -31,6 +31,7 @@ end
 
 local SEND_MODES = {
   [0] = 'post fader', [1] = 'pre FX', [2] = 'post FX', [3] = 'pre fader',
+  [8] = 'pre receive',
 }
 
 --- Linear volume as spoken dB.
@@ -83,7 +84,13 @@ local function main()
   else
     parts[#parts + 1] = a11y.plural(sends, 'send')
     for i = 0, sends - 1 do
-      local _, dest = reaper.GetTrackSendName(track, i, '')
+      -- GetTrackSendName counts hardware outputs first, so on a track with
+      -- one the names would be off by one. The destination track is exact.
+      local dest_track = reaper.GetTrackSendInfo_Value(track, 0, i, 'P_DESTTRACK')
+      local dest = 'an unknown track'
+      if dest_track and reaper.ValidatePtr(dest_track, 'MediaTrack*') then
+        dest = 'track ' .. label_of(dest_track)
+      end
       local vol = reaper.GetTrackSendInfo_Value(track, 0, i, 'D_VOL')
       local muted = reaper.GetTrackSendInfo_Value(track, 0, i, 'B_MUTE') > 0
       local mode = math.floor(reaper.GetTrackSendInfo_Value(track, 0, i, 'I_SENDMODE'))
@@ -98,7 +105,11 @@ local function main()
   if receives > 0 then
     parts[#parts + 1] = a11y.plural(receives, 'receive')
     for i = 0, receives - 1 do
-      local _, src = reaper.GetTrackReceiveName(track, i, '')
+      local src_track = reaper.GetTrackSendInfo_Value(track, -1, i, 'P_SRCTRACK')
+      local src = 'an unknown track'
+      if src_track and reaper.ValidatePtr(src_track, 'MediaTrack*') then
+        src = 'track ' .. label_of(src_track)
+      end
       local vol = reaper.GetTrackSendInfo_Value(track, -1, i, 'D_VOL')
       local muted = reaper.GetTrackSendInfo_Value(track, -1, i, 'B_MUTE') > 0
       local line = string.format('receive %d from %s at %s', i + 1, src, db_phrase(vol))

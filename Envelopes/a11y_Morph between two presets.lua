@@ -1,7 +1,7 @@
 --[[
   @description Morph between two plugin presets over the time selection (accessible)
   @author Accessible ReaScripts contributors
-  @version 1.0.0
+  @version 1.0.1
   @provides [main] .
   @about
     Pick a plugin, pick a preset to start from and a preset to end on, and
@@ -27,7 +27,10 @@
 
     Reading preset names means loading each one briefly, because REAPER has
     no call for "name of preset at index". That makes noise, so this refuses
-    to run during playback.
+    to run during playback. If you cancel partway, the plugin's settings are
+    put back as they were. Once the morph is written, the plugin is left on
+    the starting preset, so any changes you made since loading a preset are
+    replaced by it.
 
     Leaves existing envelopes on parameters that do not differ between the
     two presets completely alone.
@@ -89,23 +92,37 @@ local function preset_list(tr, fx)
   for i = 0, capped - 1 do
     if reaper.TrackFX_SetPresetByIndex(tr, fx, i) then
       local _, name = reaper.TrackFX_GetPreset(tr, fx, '')
+      -- VST3 factory presets come back as a full file path, which would be
+      -- read aloud one folder at a time.
+      if name and name:find('[\\/]') then name = a11y.basename(name, true) end
       if name == nil or name == '' then name = 'Preset ' .. (i + 1) end
       out[#out + 1] = { index = i, name = name }
     end
   end
-  reaper.TrackFX_SetPresetByIndex(tr, fx, original)
+  -- -1 means no preset is loaded, and setting -1 would load the default
+  -- preset instead, so that case is left to the caller's restore.
+  if original and original >= 0 then
+    reaper.TrackFX_SetPresetByIndex(tr, fx, original)
+  end
   reaper.PreventUIRefresh(-1)
 
   return out, count, count > capped
 end
 
---- Normalised value of every parameter, indexed from 0.
+--- Value of every parameter, indexed from 0, in the plugin's own range.
+-- FX envelopes hold that raw value, not a normalised one. The two agree for
+-- VST and AU, which run 0 to 1, but not for a JSFX slider running 20 to
+-- 20000, so the raw value is the one to write.
 local function snapshot(tr, fx, nparams)
   local values = {}
   for p = 0, nparams - 1 do
-    values[p] = reaper.TrackFX_GetParamNormalized(tr, fx, p)
+    values[p] = reaper.TrackFX_GetParam(tr, fx, p)
   end
   return values
+end
+
+local function restore(tr, fx, values)
+  for p, v in pairs(values) do reaper.TrackFX_SetParam(tr, fx, p, v) end
 end
 
 --- True when a parameter moves in steps rather than continuously.
@@ -181,7 +198,14 @@ local function main()
   local fx = chosen_fx.index
   a11y.speak('Reading presets for ' .. chosen_fx.name .. '.')
 
+  -- Reading the presets loads each one, which would lose whatever the
+  -- plugin is set to now. Keep a copy, and put it back if the morph does
+  -- not go ahead.
+  local before = snapshot(tr, fx, reaper.TrackFX_GetNumParams(tr, fx))
   local presets, total, truncated = preset_list(tr, fx)
+  local proceeding = false
+  local from_preset, to_preset, answer
+  local ok_ask, ask_err = pcall(function()
   if #presets < 2 then
     a11y.abort(string.format('%s reports %s. A morph needs at least two.',
                              chosen_fx.name, a11y.plural(#presets, 'preset')))
@@ -200,19 +224,28 @@ local function main()
     return pick
   end
 
-  local from_preset = choose('Start')
-  local to_preset = choose('End')
+  from_preset = choose('Start')
+  to_preset = choose('End')
 
   if from_preset.index == to_preset.index then
     a11y.abort('Start and end are both ' .. from_preset.name ..
                '. Nothing would change.')
   end
 
-  local ok, answer = reaper.GetUserInputs(
+  local ok
+  ok, answer = reaper.GetUserInputs(
     'Morph ' .. from_preset.name .. ' to ' .. to_preset.name, 2,
-    'Fade wet in from silent, yes or no:,Switch stepped parameters at start or end:,extrawidth=110',
+    'Fade wet in from silent (yes or no):,Switch stepped parameters at start or end:,extrawidth=110',
     a11y.recall('morph_wet', 'no') .. ',' .. a11y.recall('morph_switch', 'end'))
   if not ok then a11y.abort('Cancelled.') end
+  proceeding = true
+  end)
+  if not proceeding then
+    reaper.PreventUIRefresh(1)
+    restore(tr, fx, before)
+    reaper.PreventUIRefresh(-1)
+    if not ok_ask then error(ask_err, 0) end
+  end
 
   local wet_text, switch_text = answer:match('^([^,]*),(.*)$')
   local fade_wet = (wet_text or ''):lower():sub(1, 1) == 'y'
@@ -280,6 +313,10 @@ local function main()
     chosen_fx.name, from_preset.name, to_preset.name), -1)
   reaper.UpdateArrange()
 
+  if #ramped == 0 and #switched == 0 and not wet_done and failed > 0 then
+    a11y.abort(string.format('REAPER would not create an envelope for any of the %s ' ..
+      'that differ, so nothing was written.', a11y.plural(failed, 'parameter')))
+  end
   if #ramped == 0 and #switched == 0 and not wet_done then
     a11y.abort(string.format(
       '%s and %s have no parameters that differ, so nothing was written.',
@@ -288,7 +325,7 @@ local function main()
 
   local msg = string.format('Morphed %s from %s to %s over %s. %s ramped',
     chosen_fx.name, from_preset.name, to_preset.name,
-    a11y.duration_phrase(end_time - start_time),
+    a11y.time_phrase(end_time - start_time),
     a11y.plural(#ramped, 'parameter'))
 
   if #switched > 0 then

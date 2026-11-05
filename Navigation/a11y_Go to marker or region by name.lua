@@ -1,7 +1,7 @@
 --[[
   @description Go to marker or region by name (accessible)
   @author Accessible ReaScripts contributors
-  @version 1.0.0
+  @version 1.0.1
   @provides [main] .
   @about
     Jump to a marker or region by typing part of its name, rather than
@@ -44,11 +44,27 @@ local function collect()
         rgnend    = rgnend,
         name      = display,
         number    = number,
-        -- Searchable text includes the number, so typing "12" finds
-        -- marker 12 even when it has a name.
-        search    = display .. ' ' .. tostring(number),
+        search    = display,
       }
     end
+  end
+  return out
+end
+
+--- Rank the search. A query that is a whole number goes straight to that
+--- number first; everything else is searched by name. Searching name and
+--- number together used to let "3" put tracks 30 to 39 ahead of track 3,
+--- and "piano 1" put track 12, Piano, ahead of track 3, Piano 1.
+local function search(query, entries, name_of)
+  local hits = a11y.filter(query, entries, name_of)
+  local n = tonumber((query:gsub('^%s+', ''):gsub('%s+$', '')))
+  if not n or n ~= math.floor(n) then return hits end
+  local out, seen = {}, {}
+  for _, e in ipairs(entries) do
+    if e.number == n then out[#out + 1] = e; seen[e] = true end
+  end
+  for _, e in ipairs(hits) do
+    if not seen[e] then out[#out + 1] = e end
   end
   return out
 end
@@ -57,7 +73,7 @@ local function label(entry)
   local kind = entry.is_region and 'region' or 'marker'
   if entry.is_region then
     return string.format('%s %d, %s, %s long', kind, entry.number, entry.name,
-                         a11y.duration_phrase(entry.rgnend - entry.pos))
+                         a11y.time_phrase(entry.rgnend - entry.pos))
   end
   return string.format('%s %d, %s', kind, entry.number, entry.name)
 end
@@ -75,7 +91,7 @@ local function main()
     a11y.abort('Cancelled.')
   end
 
-  local hits = a11y.filter(query, entries, function(e) return e.search end)
+  local hits = search(query, entries, function(e) return e.search end)
   if #hits == 0 then
     a11y.abort(string.format('Nothing matches %s. %s in this project.',
                              query, a11y.plural(#entries, 'marker or region',

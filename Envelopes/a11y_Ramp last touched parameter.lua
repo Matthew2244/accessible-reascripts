@@ -1,7 +1,7 @@
 --[[
   @description Ramp last touched parameter (accessible)
   @author Accessible ReaScripts contributors
-  @version 1.2.1
+  @version 1.2.2
   @provides [main] .
   @about
     Write a rise or fall on whatever FX parameter you touched last,
@@ -73,6 +73,10 @@ local function last_touched()
       return nil, 'The last touched parameter belongs to a take FX on an item. ' ..
                   'This script only ramps track FX so far.'
     end
+    if (fxidx & 0x1000000) ~= 0 then
+      return nil, 'The last touched parameter is on an input FX, which REAPER ' ..
+                  'cannot automate.'
+    end
     local track = trackidx == -1 and reaper.GetMasterTrack(0)
                                   or reaper.GetTrack(0, trackidx)
     if not track then return nil end
@@ -83,7 +87,13 @@ local function last_touched()
   if not ok then return nil end
   -- In this older API, a take FX packs the item index into the high word
   -- of tracknumber and the take index into the high word of fxnumber.
-  if math.floor(tracknumber / 65536) ~= 0 or math.floor(fxnumber / 65536) ~= 0 then
+  -- Input (record) FX set bit 24 of fxnumber instead, and cannot be
+  -- automated at all, so they get their own reason.
+  if (fxnumber & 0x1000000) ~= 0 then
+    return nil, 'The last touched parameter is on an input FX, which REAPER ' ..
+                'cannot automate.'
+  end
+  if (tracknumber >> 16) ~= 0 or (fxnumber >> 16) ~= 0 then
     return nil, 'The last touched parameter belongs to a take FX on an item. ' ..
                 'This script only ramps track FX so far.'
   end
@@ -141,7 +151,7 @@ local function main()
   local ok, answer = reaper.GetUserInputs(
     'Ramp ' .. parmname, 4,
     'Start percent,End percent 0 to 100,' ..
-    'Seconds (blank = time selection),Curve (linear slow fast start...),extrawidth=80',
+    'Seconds if no time selection,Curve (linear slow fast start...),extrawidth=80',
     string.format('%.0f,,,linear', current_pct))
   if not ok then
     a11y.abort('Cancelled. Nothing changed.')
@@ -160,7 +170,9 @@ local function main()
   if have_selection then
     ramp_start, ramp_end = sel_start, sel_end
   else
-    local secs = tonumber((f3 or ''):gsub('%s', ''))
+    -- gsub returns two values; the extra parentheses keep the count from
+    -- reaching tonumber as a number base.
+    local secs = tonumber(((f3 or ''):gsub('%s', '')))
     if not secs or secs <= 0 then
       a11y.abort('There is no time selection, and no number of seconds was given, ' ..
                  'so there is nowhere to put the ramp. Nothing changed.')
@@ -243,7 +255,7 @@ local function main()
   a11y.speak(string.format(
     'Wrote a %s ramp on %s, %s, %s: %s to %s over %s, ending at %s. Envelope selected.',
     shape_name, parmname, fxname, track_phrase, start_label, end_label,
-    string.format('%.3g seconds', ramp_end - ramp_start),
+    a11y.time_phrase(ramp_end - ramp_start),
     reaper.format_timestr(ramp_end, '')))
 end
 

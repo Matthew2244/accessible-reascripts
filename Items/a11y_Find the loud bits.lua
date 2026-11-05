@@ -1,7 +1,7 @@
 --[[
   @description Find the loud bits (accessible)
   @author Accessible ReaScripts contributors
-  @version 1.0.0
+  @version 1.0.1
   @provides [main] .
   @about
     Asks you for a level, then speaks every moment in the selected items
@@ -52,15 +52,14 @@ local function main()
   end
   a11y.remember('loud_threshold', threshold)
 
-  local found, loudest, loudest_at, unreadable = {}, -math.huge, 0, 0
+  local found, loudest, loudest_at, unreadable, skipped = {}, -math.huge, 0, 0, 0
   for i = 0, count - 1 do
     local item = reaper.GetSelectedMediaItem(0, i)
     local take = reaper.GetActiveTake(item)
     if take and not reaper.TakeIsMIDI(take) then
       local pos = reaper.GetMediaItemInfo_Value(item, 'D_POSITION')
       local length = reaper.GetMediaItemInfo_Value(item, 'D_LENGTH')
-      local offset = reaper.GetMediaItemTakeInfo_Value(take, 'D_STARTOFFS')
-      local levels = a11y.read_levels(take, RATE, offset, length)
+      local levels = a11y.read_levels(take, RATE, pos, length)
       if #levels == 0 then
         unreadable = unreadable + 1
       else
@@ -75,6 +74,8 @@ local function main()
           if db > loudest then loudest = db end
         end
       end
+    else
+      skipped = skipped + 1
     end
   end
 
@@ -84,6 +85,16 @@ local function main()
   if unreadable > 0 then
     note = string.format(' %s I could not read, so they are not in this answer.',
                          a11y.plural(unreadable, 'item', 'items'))
+  end
+
+  if skipped > 0 then
+    note = note .. string.format(' %s MIDI or empty, and skipped.',
+                                 a11y.plural(skipped, 'item was', 'items were'))
+  end
+
+  if loudest == -math.huge then
+    a11y.abort('I could not read the audio of any selected item, so I cannot ' ..
+               'say what is loud.' .. note)
   end
 
   if #found == 0 then

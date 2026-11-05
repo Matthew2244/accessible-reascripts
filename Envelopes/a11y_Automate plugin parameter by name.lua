@@ -1,7 +1,7 @@
 --[[
   @description Automate plugin parameter by name (accessible)
   @author Accessible ReaScripts contributors
-  @version 1.0.0
+  @version 1.0.1
   @provides [main] .
   @about
     Type part of a parameter's name and get an envelope for it, ready to
@@ -107,6 +107,15 @@ local function envelope_for(tr, choice)
   return env, shown
 end
 
+--- An envelope that already existed may be hidden, and creating one does
+--- not promise to show it, so visibility is set either way.
+local function show(env)
+  if reaper.GetSetEnvelopeInfo_String then
+    reaper.GetSetEnvelopeInfo_String(env, 'VISIBLE', '1', true)
+    reaper.TrackList_AdjustWindows(false)
+  end
+end
+
 local function main()
   local tr = reaper.GetSelectedTrack(0, 0)
   if not tr then
@@ -137,6 +146,7 @@ local function main()
 
   reaper.Undo_BeginBlock()
   local env, shown = envelope_for(tr, choice)
+  if env then show(env) end
   reaper.Undo_EndBlock('Create envelope for ' .. choice.label, -1)
 
   if not env then

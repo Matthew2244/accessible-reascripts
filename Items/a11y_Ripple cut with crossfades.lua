@@ -1,12 +1,15 @@
 --[[
   @description Ripple cut with crossfades (accessible)
   @author Accessible ReaScripts contributors
-  @version 1.0.0
+  @version 1.0.1
   @provides [main] .
   @about
-    Takes the time selection out of every track and closes the gap, then
-    crossfades every join it just made, so the edit does not click or drop
-    a hole in a room tone.
+    Takes the time selection out of the selected tracks, or every track if
+    none is selected, and closes the gap, then crossfades every join it
+    just made, so the edit does not click or drop a hole in a room tone.
+    Only items move. Envelopes, markers, regions and tempo stay where they
+    are, so automation after the cut will sit later than the audio it
+    belonged to.
 
     Reaper's own ripple edit closes the gap. What it does not do is make
     sure the join is crossfaded at a length you chose, and a butt splice in
@@ -86,7 +89,7 @@ local function main()
                              'Crossfade length in milliseconds',
                              a11y.recall('ripple_crossfade_ms', '250'))
   if not answer then a11y.abort('Left it alone.') end
-  local ms = tonumber((answer:gsub('[^%d%.]', '')))
+  local ms = tonumber((answer:gsub('[^%d%.%-]', '')))
   if not ms or ms < 0 then
     a11y.abort('I could not read "' .. answer .. '" as a number of milliseconds.')
   end
@@ -95,6 +98,7 @@ local function main()
 
   local gap = to - from
   local removed, crossfaded, butted, moved = 0, 0, 0, 0
+  local shortest = math.huge
 
   reaper.Undo_BeginBlock()
   reaper.PreventUIRefresh(1)
@@ -134,17 +138,31 @@ local function main()
 
       if before and after then
         local take = reaper.GetActiveTake(after)
-        local headroom = 0
+        local headroom, rate = 0, 1
         if take then
-          headroom = reaper.GetMediaItemTakeInfo_Value(take, 'D_STARTOFFS')
+          -- The offset is in seconds of the source file. At a playback
+          -- rate other than 1 that is a different number of seconds on
+          -- the timeline.
+          rate = reaper.GetMediaItemTakeInfo_Value(take, 'D_PLAYRATE')
+          if rate <= 0 then rate = 1 end
+          headroom = reaper.GetMediaItemTakeInfo_Value(take, 'D_STARTOFFS') / rate
         end
         local overlap = math.min(fade, headroom, len_of(before), len_of(after))
         if overlap > 0.001 and take then
           -- Pull the later item back over the join and play the audio that
           -- was always sitting there in the file, so both sides are real.
+          -- Every take moves together, so each one's offset moves too.
           reaper.SetMediaItemInfo_Value(after, 'D_POSITION', pos_of(after) - overlap)
           reaper.SetMediaItemInfo_Value(after, 'D_LENGTH', len_of(after) + overlap)
-          reaper.SetMediaItemTakeInfo_Value(take, 'D_STARTOFFS', headroom - overlap)
+          for t = 0, reaper.CountTakes(after) - 1 do
+            local tk = reaper.GetTake(after, t)
+            if tk then
+              local r = reaper.GetMediaItemTakeInfo_Value(tk, 'D_PLAYRATE')
+              local o = reaper.GetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS')
+              reaper.SetMediaItemTakeInfo_Value(tk, 'D_STARTOFFS', o - overlap * r)
+            end
+          end
+          shortest = math.min(shortest, overlap)
           reaper.SetMediaItemInfo_Value(after, 'D_FADEINLEN', overlap)
           reaper.SetMediaItemInfo_Value(before, 'D_FADEOUTLEN', overlap)
           crossfaded = crossfaded + 1
@@ -176,15 +194,24 @@ local function main()
                              a11y.plural(removed, 'item'),
                              a11y.plural(moved, 'item'))
   if crossfaded > 0 then
-    said = said .. string.format(' %s crossfaded over %d milliseconds.',
-                                 a11y.plural(crossfaded, 'join'), ms)
+    local got = math.floor(shortest * 1000 + 0.5)
+    if got < math.floor(fade * 1000 + 0.5) then
+      said = said .. string.format(' %s crossfaded, the shortest over %d milliseconds, ' ..
+        'because there was not enough audio before the join for %g.',
+        a11y.plural(crossfaded, 'join'), got, ms)
+    else
+      said = said .. string.format(' %s crossfaded over %g milliseconds.',
+                                   a11y.plural(crossfaded, 'join'), ms)
+    end
   end
   if butted > 0 then
     said = said .. string.format(
       ' %s had no audio to overlap into, so %s matched fades instead.',
       a11y.plural(butted, 'join'), butted == 1 and 'it got' or 'they got')
   end
-  if crossfaded == 0 and butted == 0 then
+  if fade == 0 then
+    said = said .. ' No crossfades, since you asked for 0 milliseconds.'
+  elseif crossfaded == 0 and butted == 0 then
     said = said .. ' Nothing met at the join, so there was nothing to fade.'
   end
   a11y.speak(said)

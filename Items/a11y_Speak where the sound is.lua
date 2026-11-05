@@ -1,13 +1,13 @@
 --[[
   @description Speak where the sound is (accessible)
   @author Accessible ReaScripts contributors
-  @version 1.0.0
+  @version 1.0.1
   @provides [main] .
   @about
     Walks the selected item's audio and tells you where the sound actually
-    lives: "sound from 0 to 4.5 seconds, quiet for 1.1, sound from 5.6 to
-    22". The times are from the start of the item, and are the times you
-    would put a cursor at.
+    lives: "0 seconds to 4.5 seconds, peak minus 3 dB, quiet for 1.1
+    seconds, 5.6 seconds to 22 seconds". The times count from the start of
+    the item, not the project.
 
     This is how you find the chime buried at the head of a file, or notice
     that a stem you were told was a train is thirty seconds of nothing
@@ -54,8 +54,8 @@ local function main()
   end
 
   local length = reaper.GetMediaItemInfo_Value(item, 'D_LENGTH')
-  local offset = reaper.GetMediaItemTakeInfo_Value(take, 'D_STARTOFFS')
-  local levels = a11y.read_levels(take, RATE, offset, length)
+  local pos = reaper.GetMediaItemInfo_Value(item, 'D_POSITION')
+  local levels = a11y.read_levels(take, RATE, pos, length)
   if #levels == 0 then
     a11y.abort('I could not read the audio for that item. If it is still ' ..
                'building peaks, give it a moment and try again.')

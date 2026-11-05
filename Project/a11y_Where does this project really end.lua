@@ -1,7 +1,7 @@
 --[[
   @description Where does this project really end (accessible)
   @author Accessible ReaScripts contributors
-  @version 1.0.0
+  @version 1.0.1
   @provides [main] .
   @about
     Finds the last moment anything is actually audible, and compares it
@@ -41,7 +41,9 @@ local function items_by_end()
     local track = reaper.GetTrack(0, t)
     for i = 0, reaper.CountTrackMediaItems(track) - 1 do
       local item = reaper.GetTrackMediaItem(track, i)
-      if reaper.GetMediaItemInfo_Value(item, 'B_MUTE') == 0 then
+      -- A muted item, or one on a muted track, is not in a render.
+      if reaper.GetMediaItemInfo_Value(item, 'B_MUTE') == 0
+         and reaper.GetMediaTrackInfo_Value(track, 'B_MUTE') == 0 then
         local pos = reaper.GetMediaItemInfo_Value(item, 'D_POSITION')
         local len = reaper.GetMediaItemInfo_Value(item, 'D_LENGTH')
         all[#all + 1] = { item = item, pos = pos, len = len, stop = pos + len }
@@ -66,8 +68,7 @@ local function main()
     if last_audible and entry.stop <= last_audible then break end
     local take = reaper.GetActiveTake(entry.item)
     if take and not reaper.TakeIsMIDI(take) then
-      local offset = reaper.GetMediaItemTakeInfo_Value(take, 'D_STARTOFFS')
-      local levels = a11y.read_levels(take, RATE, offset, entry.len)
+      local levels = a11y.read_levels(take, RATE, entry.pos, entry.len)
       if #levels == 0 then
         unreadable = unreadable + 1
       else
@@ -109,17 +110,37 @@ local function main()
     parts[#parts + 1] = 'The project stops with the sound, which is what you want.'
   end
 
-  -- Render bounds only matter when they are set to something fixed.
-  local flag = reaper.GetSetProjectInfo(0, 'RENDER_BOUNDSFLAG', 0, false)
-  if flag == 2 then
-    local from = reaper.GetSetProjectInfo(0, 'RENDER_STARTPOS', 0, false)
-    local to = reaper.GetSetProjectInfo(0, 'RENDER_ENDPOS', 0, false)
+  -- Render bounds only matter when they are set to something fixed: 0 is
+  -- custom bounds, 2 the time selection. Each can also carry a render tail,
+  -- which adds its own silence after the end.
+  local flag = math.floor(reaper.GetSetProjectInfo(0, 'RENDER_BOUNDSFLAG', 0, false))
+  local tail_bits = math.floor(reaper.GetSetProjectInfo(0, 'RENDER_TAILFLAG', 0, false))
+  local tail = reaper.GetSetProjectInfo(0, 'RENDER_TAILMS', 0, false) / 1000
+  local from, to, kind, tail_bit
+  if flag == 0 then
+    from = reaper.GetSetProjectInfo(0, 'RENDER_STARTPOS', 0, false)
+    to = reaper.GetSetProjectInfo(0, 'RENDER_ENDPOS', 0, false)
+    kind, tail_bit = 'a fixed range', 1
+  elseif flag == 2 then
+    from, to = reaper.GetSet_LoopTimeRange(false, false, 0, 0, false)
+    kind, tail_bit = 'the time selection', 4
+  elseif flag == 1 then
+    tail_bit = 2
+  end
+  local with_tail = tail_bit and (tail_bits & tail_bit) ~= 0 and tail > 0
+  if flag == 1 and with_tail then
+    parts[#parts + 1] = string.format('Rendering the whole project adds a %s tail.',
+                                      a11y.time_phrase(tail))
+  end
+  if from and to and to > from then
+    if with_tail then to = to + tail end
     local over = to - last_audible
     if over > 0.25 then
       parts[#parts + 1] = string.format(
-        'Your render is set to a fixed range ending at %s, so a bounce ' ..
+        'Your render is set to %s ending at %s%s, so a bounce ' ..
         'would carry %s of silence. Worth moving before you send it anywhere.',
-        reaper.format_timestr(to, ''), a11y.time_phrase(over))
+        kind, reaper.format_timestr(to, ''), with_tail and ', counting the tail' or '',
+        a11y.time_phrase(over))
     else
       parts[#parts + 1] = string.format('Render range is %s to %s, which fits.',
                                         reaper.format_timestr(from, ''),

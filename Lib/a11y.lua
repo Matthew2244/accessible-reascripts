@@ -12,18 +12,18 @@
 
   Loading this from a script:
 
-      local sep  = package.config:sub(1, 1)
-      local root = ({reaper.get_action_context()})[2]:match('^(.*)' .. sep)
-      package.path = root .. sep .. '..' .. sep .. 'Lib' .. sep .. '?.lua;' .. package.path
-      local ok, a11y = pcall(require, 'a11y')
+      local script_dir = ({ reaper.get_action_context() })[2]:match('^(.*[\\/])')
+      package.path = script_dir .. '../Lib/?.lua;' .. package.path
+      local loaded, a11y = pcall(require, 'a11y')
 
-  See any script in this repo for the exact preamble, including the
-  spoken error shown when the library is missing.
+  See any script in this repo, or the skeleton in CONTRIBUTING.md, for the
+  exact preamble, including the spoken error shown when the library is
+  missing.
 ]]
 
 local a11y = {}
 
-a11y.VERSION = '1.1.0'
+a11y.VERSION = '1.2.0'
 
 --------------------------------------------------------------------------
 -- Speech
@@ -75,7 +75,9 @@ end
 --- has to read out as "track parenthesis s".
 function a11y.plural(n, singular, plural_form)
   plural_form = plural_form or (singular .. 's')
-  return string.format('%d %s', n, n == 1 and singular or plural_form)
+  -- %d refuses a number with a fraction, so 2.5 is written as it is.
+  local shown = n == math.floor(n) and string.format('%d', n) or tostring(n)
+  return shown .. ' ' .. (n == 1 and singular or plural_form)
 end
 
 --- Join a list into speech-friendly prose: "a, b and c".
@@ -151,6 +153,24 @@ local SHAPES = {
   { id = 4, name = 'fast end',            words = { 'fast end', 'fastend', 'end' } },
   { id = 5, name = 'bezier',              words = { 'bezier', 'bez' } },
 }
+
+--- Project time to the time an envelope's points are stored in.
+--
+-- Track envelopes use project time. A take envelope counts from the start
+-- of its item, in the take's own time, so at playback rate 2 a point one
+-- second into the item is stored at 2. Measured in REAPER 7.82 by rendering
+-- a take pitch envelope on an item at rate 1.5: the pitch moved where this
+-- conversion said it would. Returns the envelope time and the rate, so a
+-- distance between points can be turned back into seconds with / rate.
+function a11y.envelope_time(env, project_time)
+  local take = reaper.Envelope_GetParentTake and reaper.Envelope_GetParentTake(env)
+  if not take then return project_time, 1 end
+  local item = reaper.GetMediaItemTake_Item(take)
+  local pos = reaper.GetMediaItemInfo_Value(item, 'D_POSITION')
+  local rate = reaper.GetMediaItemTakeInfo_Value(take, 'D_PLAYRATE')
+  if not rate or rate <= 0 then rate = 1 end
+  return (project_time - pos) * rate, rate
+end
 
 --- Parse a curve shape from plain words, so nobody has to remember that
 --- "fast end" is 4. Unrecognised text becomes linear, which is the shape
@@ -404,8 +424,10 @@ end
 -- @param items table  list of items (must be non-empty)
 -- @param labelfn function|nil  item -> string
 -- @param max_spoken number|nil  default 12
+-- @param intro string|nil  said first, in the same breath as the list, so
+--   a separate message just before it is not cut off by the list
 -- @return item|nil, index|nil
-function a11y.pick(title, items, labelfn, max_spoken)
+function a11y.pick(title, items, labelfn, max_spoken, intro)
   labelfn = labelfn or tostring
   max_spoken = max_spoken or 12
   local n = #items
@@ -418,13 +440,17 @@ function a11y.pick(title, items, labelfn, max_spoken)
     lines[#lines + 1] = string.format('%d, %s', i, labelfn(items[i]))
   end
 
-  local header
+  local header, footer = nil, ''
   if n > shown then
     header = string.format('%d matches. First %d: ', n, shown)
+    -- Only the spoken ones can be chosen, so say how to reach the rest
+    -- rather than leave them out of reach without a word.
+    footer = ' To reach the others, cancel and search with more of the name.'
   else
     header = string.format('%d matches: ', n)
   end
-  a11y.speak(header .. table.concat(lines, '. ') .. '.')
+  a11y.speak((intro and (intro .. ' ') or '') .. header ..
+             table.concat(lines, '. ') .. '.' .. footer)
 
   local caption = string.format('Number 1 to %d:', shown)
   local answer = a11y.prompt(title, caption, '1', 60)
@@ -516,16 +542,23 @@ function a11y.scan_files(dir, ext, _folder, _acc)
   return _acc
 end
 
---- Remember a value between runs (per script key).
+-- Stored values must survive a restart, and REAPER's saved state is one
+-- line per value, so a newline is swapped for a character no path or name
+-- contains, and back again on reading.
+local NEWLINE_STANDIN = '\31'
+
+--- Remember a value between runs (per script key), including after REAPER
+--- restarts.
 function a11y.remember(key, value)
-  reaper.SetExtState('accessible_reascripts', key, tostring(value or ''), false)
+  local v = tostring(value or ''):gsub('\n', NEWLINE_STANDIN)
+  reaper.SetExtState('accessible_reascripts', key, v, true)
 end
 
 --- Read a value stored by remember().
 function a11y.recall(key, default)
   local v = reaper.GetExtState('accessible_reascripts', key)
   if v == nil or v == '' then return default end
-  return v
+  return (v:gsub(NEWLINE_STANDIN, '\n'))
 end
 
 
@@ -549,11 +582,13 @@ a11y.SILENCE_DB = -60
 --- Longer times read as minutes and seconds, because "203.417 seconds"
 --- tells you nothing you can act on.
 function a11y.time_phrase(seconds)
-  seconds = seconds or 0
-  if seconds < 60 then
-    local s = string.format('%.3f', seconds)
+  seconds = math.max(0, seconds or 0)
+  local s = string.format('%.3f', seconds)
+  -- Anything that rounds to a whole minute reads as minutes, so 59.9996
+  -- is "1 minute", never "60 seconds".
+  if tonumber(s) < 60 then
     s = s:gsub('0+$', ''):gsub('%.$', '')
-    return s .. ' seconds'
+    return s .. (s == '1' and ' second' or ' seconds')
   end
   return a11y.duration_phrase(seconds)
 end
@@ -648,6 +683,12 @@ end
 
 --- Read a take's audio as a series of peak magnitudes.
 --
+-- `start_time` is a PROJECT time, not a time in the source file: REAPER
+-- reads the take as it plays in its item, offset and playback rate
+-- included. Pass the item's position to start at the item's start.
+-- Measured in REAPER 7.82: an item at 30 seconds with a sound one second
+-- into it reads that sound at 31, and nothing at 1.
+--
 -- Returns levels, rate. Levels are 0 to 1, one entry per 1/rate second,
 -- taken as the larger of the positive and negative peak across every
 -- channel, so a mostly-negative transient still counts.
@@ -722,6 +763,12 @@ function a11y.prompt_many(title, captions, defaults, width)
   if not ok then return nil end
   local out = {}
   for v in (answer .. ','):gmatch('([^,]*),') do out[#out + 1] = v end
+  -- A comma typed into a field splits it in two and shifts every answer
+  -- after it into the wrong field. Stop rather than act on that.
+  if #out > #captions then
+    a11y.abort('One of those answers has a comma in it, which this dialog ' ..
+               'cannot take. Use a point for decimals. Nothing changed.')
+  end
   for i = #out + 1, #captions do out[i] = '' end
   return out
 end

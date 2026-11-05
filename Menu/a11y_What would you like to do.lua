@@ -1,7 +1,7 @@
 --[[
   @description What would you like to do (accessible menu)
   @author Accessible ReaScripts contributors
-  @version 1.1.0
+  @version 1.2.0
   @provides [main] .
   @about
     The front door to the whole collection. Bind this one script to one
@@ -143,7 +143,7 @@ end
 
 --- Browse: pick a category, then a script inside it. Scripts you ran
 --- recently appear as their own group at the top.
-local function browse(scripts, categories, by_category)
+local function browse(scripts, categories, by_category, intro)
   local recents = recent_entries(scripts)
   local choices = {}
   if #recents > 0 then
@@ -154,7 +154,7 @@ local function browse(scripts, categories, by_category)
   local cat = a11y.pick('Choose a category', choices, function(c)
     local list = c == 'Recent' and recents or by_category[c]
     return string.format('%s, %s', c, a11y.plural(#list, 'script'))
-  end)
+  end, nil, intro)
   if not cat then
     a11y.abort('Cancelled. Nothing was run.')
   end
@@ -189,10 +189,23 @@ local function main()
   if query == '' then
     entry = browse(scripts, categories, by_category)
   else
-    local matches = a11y.filter(query, scripts, function(e) return e.corpus end)
+    -- A match on the script's name comes first. Everything else matches on
+    -- the whole header, where every script is long enough that length no
+    -- longer separates them, so searching "fades" used to put Set fades on
+    -- selected items fifth, behind scripts that merely mention a fade.
+    local matches, seen = {}, {}
+    for _, e in ipairs(a11y.filter(query, scripts, function(s) return s.name end)) do
+      matches[#matches + 1] = e
+      seen[e] = true
+    end
+    for _, e in ipairs(a11y.filter(query, scripts, function(s) return s.corpus end)) do
+      if not seen[e] then matches[#matches + 1] = e end
+    end
     if #matches == 0 then
-      a11y.speak(string.format('Nothing here does "%s" yet. Browsing instead.', query))
-      entry = browse(scripts, categories, by_category)
+      -- Not remembered: a search that found nothing is not one to prefill.
+      query = ''
+      entry = browse(scripts, categories, by_category,
+                     'Nothing here does that yet. Browsing instead.')
     else
       entry = a11y.pick('What would you like to do?', matches,
                         function(e) return e.name end)

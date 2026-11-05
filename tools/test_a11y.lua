@@ -549,6 +549,54 @@ do
         a11y.time_phrase(2) == '2 seconds', a11y.time_phrase(2))
   check('past a minute it reads as minutes and seconds',
         a11y.time_phrase(74) == '1 minute 14 seconds', a11y.time_phrase(74))
+  check('one second is singular', a11y.time_phrase(1) == '1 second', a11y.time_phrase(1))
+  check('a hair under one second rounds to singular too',
+        a11y.time_phrase(0.9996) == '1 second', a11y.time_phrase(0.9996))
+  check('a hair under a minute is a minute, never 60 seconds',
+        a11y.time_phrase(59.9996) == '1 minute', a11y.time_phrase(59.9996))
+  check('a negative time reads as 0, not minus 0',
+        a11y.time_phrase(-0.0001) == '0 seconds', a11y.time_phrase(-0.0001))
+  check('plural takes a fraction without erroring',
+        a11y.plural(2.5, 'semitone') == '2.5 semitones', a11y.plural(2.5, 'semitone'))
+end
+
+do
+  -- remember() persists across restarts, and REAPER's saved state is one
+  -- line per value, so a newline must not reach it.
+  local store = {}
+  local saved_set, saved_get = reaper.SetExtState, reaper.GetExtState
+  local persisted, stored_raw
+  reaper.SetExtState = function(sec, key, v, persist)
+    store[key] = v; persisted = persist; stored_raw = v
+  end
+  reaper.GetExtState = function(sec, key) return store[key] or '' end
+  a11y.remember('k', 'one\ntwo')
+  check('remembered values persist', persisted == true)
+  check('a newline never reaches saved state', not stored_raw:find('\n'))
+  check('a newline comes back as a newline', a11y.recall('k') == 'one\ntwo')
+  a11y.remember('w', 'C:\\new folder\\sounds')
+  check('a Windows path survives untouched', a11y.recall('w') == 'C:\\new folder\\sounds',
+        a11y.recall('w'))
+  reaper.SetExtState, reaper.GetExtState = saved_set, saved_get
+end
+
+do
+  -- A take envelope counts from its item's start, in the take's own time.
+  local saved = {}
+  for _, k in ipairs({ 'Envelope_GetParentTake', 'GetMediaItemTake_Item',
+                       'GetMediaItemInfo_Value', 'GetMediaItemTakeInfo_Value' }) do
+    saved[k] = reaper[k]
+  end
+  reaper.Envelope_GetParentTake = function(env) return env.take end
+  reaper.GetMediaItemTake_Item = function() return 'item' end
+  reaper.GetMediaItemInfo_Value = function() return 10 end
+  reaper.GetMediaItemTakeInfo_Value = function() return 1.5 end
+  local t, rate = a11y.envelope_time({ take = 'take' }, 12)
+  check('take envelope time is item relative and scaled by rate', t == 3 and rate == 1.5,
+        tostring(t) .. ' ' .. tostring(rate))
+  t, rate = a11y.envelope_time({}, 12)
+  check('track envelope time passes through', t == 12 and rate == 1)
+  for k, v in pairs(saved) do reaper[k] = v end
 end
 
 --------------------------------------------------------------------------
@@ -656,6 +704,16 @@ do
         got and #got == 3 and got[1] == '5' and got[2] == '' and got[3] == '60')
   reaper.GetUserInputs = function() return false, '' end
   check('cancel gives nil', a11y.prompt_many('t', { 'One' }) == nil)
+  -- A comma typed into a field would shift every later answer along.
+  reaper.GetUserInputs = function() return true, '-0,5,30' end
+  local spoke
+  local saved_box = reaper.ShowMessageBox
+  reaper.ShowMessageBox = function(msg) spoke = msg; return 0 end
+  local ok, err = pcall(a11y.prompt_many, 't', { 'One', 'Two' })
+  check('a comma in an answer stops with a reason',
+        not ok and type(err) == 'table' and err.a11y_abort and spoke and spoke:find('comma'),
+        tostring(spoke))
+  reaper.ShowMessageBox = saved_box
   reaper.GetUserInputs = saved
 end
 
